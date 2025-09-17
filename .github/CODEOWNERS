@@ -1,0 +1,17 @@
+# CODEOWNERS file for repository access control
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners - these users are requested for review when anyone opens a pull request
+* @MohammedMusharraf11 @bilalinbytes @mayan05 @Mohammed-Shazi-Ul-Islam @itsjiyapatel @Greesh-SE @Siri2512 @Hurry-sh @pes2ug22cs137 @Animesh
+
+# Specific file/folder ownership
+# Documentation
+docs/ @MohammedMusharraf11 @bilalinbytes @mayan05 @Mohammed-Shazi-Ul-Islam @itsjiyapatel @Greesh-SE @Siri2512 @Hurry-sh @pes2ug22cs137 @Animesh
+
+# Configuration files
+*.json @MohammedMusharraf11 @bilalinbytes @mayan05 @Mohammed-Shazi-Ul-Islam @itsjiyapatel @Greesh-SE @Siri2512 @Hurry-sh @pes2ug22cs137 @Animesh
+*.yml @MohammedMusharraf11 @bilalinbytes @mayan05 @Mohammed-Shazi-Ul-Islam @itsjiyapatel @Greesh-SE @Siri2512 @Hurry-sh @pes2ug22cs137 @Animesh
+*.yaml @MohammedMusharraf11 @bilalinbytes @mayan05 @Mohammed-Shazi-Ul-Islam @itsjiyapatel @Greesh-SE @Siri2512 @Hurry-sh @pes2ug22cs137 @Animesh
+
+# Student IDs for reference:
+# MohammedMusharraf11, bilalinbytes, mayan05, Mohammed-Shazi-Ul-Islam
