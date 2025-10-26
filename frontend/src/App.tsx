@@ -7,8 +7,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
+// ✅ Pages
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";  // ✅ Added import
+import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
@@ -17,6 +18,10 @@ import Reports from "./pages/Reports";
 import AuditLog from "./pages/AuditLog";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+
+// ✅ Role-based dashboards (optional)
+import AdminDashboard from "./pages/AdminDashboard";
+//import ManagerDashboard from "./pages/ManagerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -29,14 +34,14 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              {/* Redirect root to dashboard */}
+              {/* Default route */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} /> {/* ✅ Added route */}
+              <Route path="/signup" element={<Signup />} />
 
-              {/* Protected routes */}
+              {/* Protected Routes - accessible only if logged in */}
               <Route
                 path="/dashboard"
                 element={
@@ -94,7 +99,25 @@ const App = () => (
                 }
               />
 
-              {/* Catch-all route */}
+              {/* ✅ Role-based routes */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRole="Admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              {/* <Route
+                path="/manager"
+                element={
+                  <ProtectedRoute requiredRole="Manager">
+                    <ManagerDashboard />
+                  </ProtectedRoute>
+                }
+              /> */}
+
+              {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

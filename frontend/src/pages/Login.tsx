@@ -1,29 +1,40 @@
-import { useState, useEffect } from "react";
+import React,{ useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Package } from "lucide-react";
 import { toast } from "sonner";
+import  RoleSelector  from "@/components/RoleSelector";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState("Staff");
   const [isLoading, setIsLoading] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
-      navigate("/dashboard");
+      // redirect user to their dashboard based on role
+      if (user.role === "Admin") navigate("/admin");
+      else if (user.role === "Manager") navigate("/manager");
+      else navigate("/staff");
     }
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast.error("Please fill in all fields");
       return;
@@ -31,10 +42,9 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      await login(email, password);
-      toast.success("Login successful!");
-    } catch (error) {
-      toast.error("Login failed. Please check your credentials.");
+      await login(email, password, selectedRole);
+    } catch (error: any) {
+      toast.error(error.message || "Login failed. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
@@ -50,12 +60,18 @@ const Login = () => {
             </div>
           </div>
           <CardTitle className="text-2xl">Perishables Management</CardTitle>
-          <CardDescription>
-            Sign in to manage your inventory
-          </CardDescription>
+          <CardDescription>Sign in to manage your inventory</CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* 🔹 Role selection */}
+            <RoleSelector
+              selectedRole={selectedRole}
+              setSelectedRole={setSelectedRole}
+              mode="login"
+            />
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -68,6 +84,7 @@ const Login = () => {
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -80,26 +97,33 @@ const Login = () => {
                 required
               />
             </div>
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
           {/* Signup Link */}
-          <div className="text-center mt-4 text-sm">
-            <span className="text-muted-foreground">
-              Don’t have an account?{" "}
-            </span>
-            <Link to="/signup" className="text-primary font-medium hover:underline">
-              Sign up
-            </Link>
-          </div>
+          {selectedRole !== "Admin" && (
+            <div className="text-center mt-4 text-sm">
+              <span className="text-muted-foreground">
+                Don’t have an account?{" "}
+              </span>
+              <Link
+                to="/signup"
+                className="text-primary font-medium hover:underline"
+              >
+                Sign up
+              </Link>
+            </div>
+          )}
 
+          {/* Demo Credentials */}
           <div className="mt-6 p-4 bg-muted rounded-lg text-sm">
             <p className="font-medium mb-2">Demo Credentials:</p>
-            <p className="text-muted-foreground">Manager: manager@store.com</p>
-            <p className="text-muted-foreground">Staff: staff@store.com</p>
-            <p className="text-muted-foreground">Password: any</p>
+            <p className="text-muted-foreground">🧑‍💼 Manager: manager@store.com</p>
+            <p className="text-muted-foreground">👷 Staff: staff@store.com</p>
+            <p className="text-muted-foreground">👑 Admin: admin@pms.com / 1234</p>
           </div>
         </CardContent>
       </Card>
