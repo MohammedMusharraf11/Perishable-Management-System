@@ -1,25 +1,14 @@
-import { ReactNode, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: "Manager" | "Staff";
+  requiredRole?: "Admin" | "Manager" | "Staff";
 }
 
 export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { user, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      navigate("/login");
-    }
-    
-    if (!isLoading && user && requiredRole && user.role !== requiredRole && user.role !== "Manager") {
-      navigate("/dashboard");
-    }
-  }, [user, isLoading, navigate, requiredRole]);
 
   if (isLoading) {
     return (
@@ -32,5 +21,23 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  return user ? <>{children}</> : null;
+  // Not logged in → redirect to login
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Role-based access control
+  if (requiredRole && user.role !== requiredRole) {
+    // Redirect to appropriate dashboard based on role
+    if (user.role === "Admin") {
+      return <Navigate to="/admin" replace />;
+    } else if (user.role === "Manager") {
+      return <Navigate to="/manager" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // User has required role or no role restriction
+  return <>{children}</>;
 };

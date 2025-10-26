@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React,{ useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ const Signup = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"Manager" | "Staff">("Staff");
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -26,9 +27,15 @@ const Signup = () => {
 
     setIsLoading(true);
     try {
-      await register(name, email, password);
-      toast.success("Account created successfully!");
-      navigate("/dashboard");
+      // Register the user (backend should set approvalStatus: "pending" for Manager)
+      await register(name, email, password, role);
+
+      if (role === "Manager") {
+        toast.info("Signup successful! Please wait for admin approval before you can log in.");
+      } else {
+        toast.success("Account created successfully!");
+        navigate("/dashboard");
+      }
     } catch (error) {
       toast.error("Signup failed. Please try again.");
     } finally {
@@ -48,6 +55,7 @@ const Signup = () => {
           <CardTitle className="text-2xl">Create Account</CardTitle>
           <CardDescription>Sign up to start managing your inventory</CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -62,6 +70,7 @@ const Signup = () => {
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -74,6 +83,7 @@ const Signup = () => {
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -86,15 +96,43 @@ const Signup = () => {
                 required
               />
             </div>
+
+            {/* Role selection */}
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="Manager"
+                    checked={role === "Manager"}
+                    onChange={() => setRole("Manager")}
+                    disabled={isLoading}
+                  />
+                  Manager
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="Staff"
+                    checked={role === "Staff"}
+                    onChange={() => setRole("Staff")}
+                    disabled={isLoading}
+                  />
+                  Staff
+                </label>
+              </div>
+            </div>
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Sign Up"}
             </Button>
           </form>
 
           <div className="text-center mt-4 text-sm">
-            <span className="text-muted-foreground">
-              Already have an account?{" "}
-            </span>
+            <span className="text-muted-foreground">Already have an account? </span>
             <Link to="/login" className="text-primary font-medium hover:underline">
               Sign in
             </Link>
