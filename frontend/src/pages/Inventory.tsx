@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +27,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, X, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 interface InventoryItem {
@@ -43,6 +50,10 @@ interface InventoryItem {
 
 const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([
     {
@@ -92,6 +103,38 @@ const Inventory = () => {
     },
   ]);
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Load filter state from sessionStorage on component mount
+  useEffect(() => {
+    const savedFilters = sessionStorage.getItem('inventoryFilters');
+    if (savedFilters) {
+      const filters = JSON.parse(savedFilters);
+      setSearchTerm(filters.searchTerm || "");
+      setStatusFilter(filters.statusFilter || "all");
+      setStartDate(filters.startDate || "");
+      setEndDate(filters.endDate || "");
+    }
+  }, []);
+
+  // Save filter state to sessionStorage whenever filters change
+  useEffect(() => {
+    const filters = {
+      searchTerm,
+      statusFilter,
+      startDate,
+      endDate,
+    };
+    sessionStorage.setItem('inventoryFilters', JSON.stringify(filters));
+  }, [searchTerm, statusFilter, startDate, endDate]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "fresh":
@@ -117,12 +160,38 @@ const Inventory = () => {
     toast.success("Item deleted successfully");
   };
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setStartDate("");
+    setEndDate("");
+    toast.info("Filters cleared");
+  };
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      // Search filter (case-insensitive)
+      const matchesSearch = 
+        item.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        item.sku.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        item.category.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+
+      // Status filter
+      const matchesStatus = 
+        statusFilter === "all" ||
+        (statusFilter === "active" && item.status === "fresh") ||
+        (statusFilter === "expiring-soon" && item.status === "near-expiry") ||
+        (statusFilter === "expired" && item.status === "expired");
+
+      // Date range filter
+      const itemExpiryDate = new Date(item.expiryDate);
+      const matchesDateRange = 
+        (!startDate || itemExpiryDate >= new Date(startDate)) &&
+        (!endDate || itemExpiryDate <= new Date(endDate));
+
+      return matchesSearch && matchesStatus && matchesDateRange;
+    });
+  }, [items, debouncedSearchTerm, statusFilter, startDate, endDate]);
 
   return (
     <Layout>
@@ -193,14 +262,84 @@ const Inventory = () => {
           <CardHeader>
             <CardTitle>Stock Overview</CardTitle>
             <CardDescription>
-              <div className="flex items-center gap-2 mt-4">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by SKU, name, or category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
+              <div className="space-y-4 mt-4">
+                {/* Search Bar */}
+                <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2 border">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by SKU, name, or category..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="max-w-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Status Filter */}
+                  <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2 border">
+                    <Label htmlFor="status-filter" className="text-sm font-medium text-muted-foreground">
+                      Status:
+                    </Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px] h-8 border-muted-foreground/20 focus:border-primary">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Date Range Filters */}
+                  <div className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-2 border">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="start-date" className="text-sm font-medium text-muted-foreground">
+                        From:
+                      </Label>
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-[140px] h-8 text-sm border-muted-foreground/20 focus:border-primary"
+                      />
+                    </div>
+                    <div className="h-4 w-px bg-border"></div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="end-date" className="text-sm font-medium text-muted-foreground">
+                        To:
+                      </Label>
+                      <Input
+                        id="end-date"
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-[140px] h-8 text-sm border-muted-foreground/20 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                </div>
+
+                {/* Results Count */}
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredItems.length} of {items.length} items
+                </div>
               </div>
             </CardDescription>
           </CardHeader>
