@@ -34,8 +34,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit, Trash2, X, Calendar } from "lucide-react";
+import { Plus, Search, Edit, Trash2, X, Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 
 interface InventoryItem {
@@ -52,8 +59,8 @@ const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([
     {
@@ -119,8 +126,8 @@ const Inventory = () => {
       const filters = JSON.parse(savedFilters);
       setSearchTerm(filters.searchTerm || "");
       setStatusFilter(filters.statusFilter || "all");
-      setStartDate(filters.startDate || "");
-      setEndDate(filters.endDate || "");
+      setStartDate(filters.startDate ? new Date(filters.startDate) : undefined);
+      setEndDate(filters.endDate ? new Date(filters.endDate) : undefined);
     }
   }, []);
 
@@ -129,8 +136,8 @@ const Inventory = () => {
     const filters = {
       searchTerm,
       statusFilter,
-      startDate,
-      endDate,
+      startDate: startDate?.toISOString() || "",
+      endDate: endDate?.toISOString() || "",
     };
     sessionStorage.setItem('inventoryFilters', JSON.stringify(filters));
   }, [searchTerm, statusFilter, startDate, endDate]);
@@ -163,8 +170,8 @@ const Inventory = () => {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setStartDate("");
-    setEndDate("");
+    setStartDate(undefined);
+    setEndDate(undefined);
     toast.info("Filters cleared");
   };
 
@@ -186,8 +193,8 @@ const Inventory = () => {
       // Date range filter
       const itemExpiryDate = new Date(item.expiryDate);
       const matchesDateRange = 
-        (!startDate || itemExpiryDate >= new Date(startDate)) &&
-        (!endDate || itemExpiryDate <= new Date(endDate));
+        (!startDate || itemExpiryDate >= startDate) &&
+        (!endDate || itemExpiryDate <= endDate);
 
       return matchesSearch && matchesStatus && matchesDateRange;
     });
@@ -296,31 +303,61 @@ const Inventory = () => {
 
                   {/* Date Range Filters */}
                   <div className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-2 border">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="start-date" className="text-sm font-medium text-muted-foreground">
+                      <Label className="text-sm font-medium text-muted-foreground">
                         From:
                       </Label>
-                      <Input
-                        id="start-date"
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-[140px] h-8 text-sm border-muted-foreground/20 focus:border-primary"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`
+                              w-[140px] h-8 justify-start text-left font-normal
+                              ${!startDate && "text-muted-foreground"}
+                              border-muted-foreground/20 focus:border-primary
+                            `}
+                          >
+                            {startDate ? format(startDate, "dd-MM-yyyy") : <span>dd-mm-yyyy</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={startDate}
+                            onSelect={setStartDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="h-4 w-px bg-border"></div>
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="end-date" className="text-sm font-medium text-muted-foreground">
+                      <Label className="text-sm font-medium text-muted-foreground">
                         To:
                       </Label>
-                      <Input
-                        id="end-date"
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-[140px] h-8 text-sm border-muted-foreground/20 focus:border-primary"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`
+                              w-[140px] h-8 justify-start text-left font-normal
+                              ${!endDate && "text-muted-foreground"}
+                              border-muted-foreground/20 focus:border-primary
+                            `}
+                          >
+                            {endDate ? format(endDate, "dd-MM-yyyy") : <span>dd-mm-yyyy</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={endDate}
+                            onSelect={setEndDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
