@@ -1,10 +1,20 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// --- This is the new, robust .env loading ---
+// 1. Get the directory name of the current file (e.g., /backend/src)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// 2. Go up two levels to the project root (from /backend/src to /)
+const projectRoot = path.resolve(__dirname, '..', '..');
+// 3. Load the .env file from the root
+dotenv.config({ path: path.join(projectRoot, '.env') });
+// --- End of new loading ---
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import inventoryRoutes from './routes/inventory.js'; // Import new routes
-
-// Use '../.env' to go one level up from /backend to the root .env file
-dotenv.config({ path: '../.env' });
+import inventoryRoutes from './routes/inventory_routes.js'; 
+import itemRoutes from './routes/item.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,7 +25,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // API Routes
-app.use('/api/inventory', inventoryRoutes); // Use the inventory routes
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/items', itemRoutes); 
 
 // Health check endpoint
 app.get('/health', (req, res) => {

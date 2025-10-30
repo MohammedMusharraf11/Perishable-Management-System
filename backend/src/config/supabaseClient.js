@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 // Use '../.env' to go one level up from /backend to the root .env file
+// Use '../.env' to go one level up from /backend/src/config to the root .env file
 dotenv.config({ path: '../.env' });
 
 const supabaseUrl = process.env.SUPABASE_URL;
