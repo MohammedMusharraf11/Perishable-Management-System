@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios"; // Import axios
+import axios from "axios"; 
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 
 // API Base URL
-const API_URL = "http://localhost:5000/api/inventory"; 
+const API_URL = import.meta.env.VITE_API_URL; 
 
 // Updated interface to match v_active_inventory view
 interface InventoryItem {

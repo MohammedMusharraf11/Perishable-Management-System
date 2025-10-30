@@ -10,6 +10,11 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     allowedHosts: [".ngrok-free.app"],
   },
+
+  // --- ADD THIS LINE ---
+  envDir: '..',
+  // ---------------------
+
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
