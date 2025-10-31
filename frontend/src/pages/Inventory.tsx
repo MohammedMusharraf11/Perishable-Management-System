@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios"; 
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,132 +42,107 @@ import {
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit, Trash2, X, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Search, Edit, Trash2, X, Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
+// API Base URL
+const API_URL = import.meta.env.VITE_API_URL; 
+
+// Updated interface to match v_active_inventory view
 interface InventoryItem {
-  id: string;
+  batch_id: string; // This is the UUID from stock_batches.id
   sku: string;
-  name: string;
+  product_name: string; // Renamed from 'name'
   category: string;
   quantity: number;
-  expiryDate: string;
-  status: "fresh" | "near-expiry" | "expired";
+  delivery_date: string;
+  expiry_date: string;
+  days_until_expiry: number; // Pre-calculated by the view
+  status: string; // 'ACTIVE', 'EXPIRING_SOON'
 }
 
+// New state for the "Add Item" form, matching the new API
+const initialFormState = {
+  sku: "",
+  name: "",
+  category: "",
+  base_price: 0,
+  quantity: 0,
+  deliveryDate: "",
+  expiryDate: "",
+};
+
 const Inventory = () => {
+  // State for data and loading
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalItems, setTotalItems] = useState(0);
+
+  // State for filters
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+
+  // State for dialogs
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [items, setItems] = useState<InventoryItem[]>([
-    {
-      id: "1",
-      sku: "DAIRY-001",
-      name: "Fresh Milk 1L",
-      category: "Dairy",
-      quantity: 45,
-      expiryDate: "2025-11-05",
-      status: "fresh",
-    },
-    {
-      id: "2",
-      sku: "MEAT-012",
-      name: "Chicken Breast",
-      category: "Meat",
-      quantity: 12,
-      expiryDate: "2025-10-27",
-      status: "near-expiry",
-    },
-    {
-      id: "3",
-      sku: "BREAD-005",
-      name: "Whole Wheat Bread",
-      category: "Bakery",
-      quantity: 8,
-      expiryDate: "2025-10-24",
-      status: "expired",
-    },
-    {
-      id: "4",
-      sku: "FRUIT-023",
-      name: "Strawberries 250g",
-      category: "Produce",
-      quantity: 30,
-      expiryDate: "2025-10-28",
-      status: "near-expiry",
-    },
-    {
-      id: "5",
-      sku: "DAIRY-008",
-      name: "Greek Yogurt",
-      category: "Dairy",
-      quantity: 67,
-      expiryDate: "2025-11-15",
-      status: "fresh",
-    },
-  ]);
+  const [newItem, setNewItem] = useState(initialFormState);
 
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 300);
-
+    }, 300); // 300ms delay
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load filter state from sessionStorage on component mount
-  useEffect(() => {
-    const savedFilters = sessionStorage.getItem('inventoryFilters');
-    if (savedFilters) {
-      const filters = JSON.parse(savedFilters);
-      setSearchTerm(filters.searchTerm || "");
-      setStatusFilter(filters.statusFilter || "all");
-      setStartDate(filters.startDate ? new Date(filters.startDate) : undefined);
-      setEndDate(filters.endDate ? new Date(filters.endDate) : undefined);
+  // Main data fetching function
+  const fetchInventory = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearchTerm) params.append("search", debouncedSearchTerm);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (startDate) params.append("startDate", format(startDate, "yyyy-MM-dd"));
+      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
+      
+      const response = await axios.get(`${API_URL}/stock`, { params });
+      setItems(response.data.data);
+      setTotalItems(response.data.count);
+    } catch (err) {
+      console.error(err);
+      const errorMessage = (err as any).response?.data?.message || "Failed to fetch inventory";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [debouncedSearchTerm, statusFilter, startDate, endDate]);
 
-  // Save filter state to sessionStorage whenever filters change
+  // Fetch data on filter change
   useEffect(() => {
-    const filters = {
-      searchTerm,
-      statusFilter,
-      startDate: startDate?.toISOString() || "",
-      endDate: endDate?.toISOString() || "",
-    };
-    sessionStorage.setItem('inventoryFilters', JSON.stringify(filters));
-  }, [searchTerm, statusFilter, startDate, endDate]);
+    fetchInventory();
+  }, [fetchInventory]);
 
+  // Helper: Get badge color
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "fresh":
-        return <Badge className="bg-success">{status}</Badge>;
-      case "near-expiry":
-        return <Badge className="bg-warning">{status}</Badge>;
-      case "expired":
-        return <Badge className="bg-destructive">{status}</Badge>;
+    switch (status.toUpperCase()) {
+      case "ACTIVE":
+        return <Badge className="bg-success">Active</Badge>;
+      case "EXPIRING_SOON":
+        return <Badge className="bg-warning">Expiring Soon</Badge>;
+      case "EXPIRED":
+        return <Badge className="bg-destructive">Expired</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
-
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    const days = Math.ceil(
-      (new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return days;
-  };
-
-  const handleDelete = (id: string) => {
-    setItems(items.filter((item) => item.id !== id));
-    toast.success("Item deleted successfully");
-  };
-
+  
+  // Helper: Clear filters
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
@@ -175,30 +151,139 @@ const Inventory = () => {
     toast.info("Filters cleared");
   };
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      // Search filter (case-insensitive)
-      const matchesSearch = 
-        item.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        item.sku.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+  // Handle input change for the "Add Item" dialog
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setNewItem((prev) => ({
+      ...prev,
+      [id]: (id === "quantity" || id === "base_price") ? parseFloat(value) : value,
+    }));
+  };
 
-      // Status filter
-      const matchesStatus = 
-        statusFilter === "all" ||
-        (statusFilter === "active" && item.status === "fresh") ||
-        (statusFilter === "expiring-soon" && item.status === "near-expiry") ||
-        (statusFilter === "expired" && item.status === "expired");
+  // Handle "Add Item" submission
+  const handleAddItem = async () => {
+    try {
+      // Map frontend state to backend API expectations
+      const payload = {
+        ...newItem,
+        deliveryDate: newItem.deliveryDate,
+        expiryDate: newItem.expiryDate,
+      };
 
-      // Date range filter
-      const itemExpiryDate = new Date(item.expiryDate);
-      const matchesDateRange = 
-        (!startDate || itemExpiryDate >= startDate) &&
-        (!endDate || itemExpiryDate <= endDate);
+      await axios.post(`${API_URL}/stock`, payload);
+      toast.success(`New batch for item "${newItem.name}" added successfully`);
+      setIsAddDialogOpen(false);
+      setNewItem(initialFormState);
+      fetchInventory(); // Refetch data to show new item
+    } catch (err) {
+      console.error(err);
+      const errorMessage = (err as any).response?.data?.message || "Failed to add item";
+      toast.error(errorMessage);
+    }
+  };
+  
+  // Handle "Delete" button click
+  const handleDelete = async (batch_id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete this batch of "${name}"?`)) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`${API_URL}/stock/${batch_id}`); // Use batch_id (UUID)
+      toast.success(`Batch of "${name}" deleted successfully`);
+      fetchInventory(); // Refetch data
+    } catch (err) {
+      console.error(err);
+      const errorMessage = (err as any).response?.data?.message || "Failed to delete item";
+      toast.error(errorMessage);
+    }
+  };
 
-      return matchesSearch && matchesStatus && matchesDateRange;
+  // Render Table Body Content (Loading, Error, Empty, Data)
+  const renderTableBody = () => {
+    if (isLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={9} className="h-24 text-center">
+            <div className="flex justify-center items-center gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="text-muted-foreground">Loading inventory...</span>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (error) {
+      return (
+        <TableRow>
+          <TableCell colSpan={9} className="h-24 text-center text-destructive">
+            Error: {error}
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (items.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={9} className="h-24 text-center">
+            No active inventory items found. Add one to get started.
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return items.map((item) => {
+      const daysLeft = item.days_until_expiry;
+      return (
+        <TableRow key={item.batch_id}> 
+          <TableCell className="font-medium">{item.sku}</TableCell>
+          <TableCell>{item.product_name}</TableCell>
+          <TableCell>{item.category}</TableCell>
+          <TableCell>{item.quantity}</TableCell>
+          <TableCell>
+            {format(new Date(item.delivery_date), "dd/MM/yyyy")}
+          </TableCell>
+          <TableCell>
+            {format(new Date(item.expiry_date), "dd/MM/yyyy")}
+          </TableCell>
+          <TableCell>
+            <span
+              className={
+                daysLeft < 0
+                  ? "text-destructive font-medium"
+                  : daysLeft <= 3
+                  ? "text-warning font-medium"
+                  : "text-muted-foreground"
+              }
+            >
+              {daysLeft} days
+            </span>
+          </TableCell>
+          <TableCell>{getStatusBadge(item.status)}</TableCell>
+          <TableCell className="text-right">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toast.info("Edit functionality coming soon")}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDelete(item.batch_id, item.product_name)}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
     });
-  }, [items, debouncedSearchTerm, statusFilter, startDate, endDate]);
+  };
 
   return (
     <Layout>
@@ -209,6 +294,7 @@ const Inventory = () => {
             <p className="text-muted-foreground">Manage your perishable stock</p>
           </div>
 
+          {/* --- ADD ITEM DIALOG (FORM UPDATED) --- */}
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -218,31 +304,48 @@ const Inventory = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Item</DialogTitle>
+                <DialogTitle>Add New Item/Batch</DialogTitle>
                 <DialogDescription>
-                  Enter the details of the new inventory item
+                  Enter product info (or SKU of existing) and batch details.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input id="sku" placeholder="DAIRY-001" />
+                <Label className="text-sm font-medium text-muted-foreground">Product Details</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="sku">SKU</Label>
+                    <Input id="sku" placeholder="DAIRY-001" value={newItem.sku} onChange={handleFormChange} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Product Name</Label>
+                    <Input id="name" placeholder="Fresh Milk 1L" value={newItem.name} onChange={handleFormChange} />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Product Name</Label>
-                  <Input id="name" placeholder="Fresh Milk 1L" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Input id="category" placeholder="Dairy" value={newItem.category} onChange={handleFormChange} />
+                  </div>
+                   <div className="grid gap-2">
+                    <Label htmlFor="base_price">Base Price</Label>
+                    <Input id="base_price" type="number" placeholder="60.00" value={newItem.base_price} onChange={handleFormChange} />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Input id="category" placeholder="Dairy" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input id="quantity" type="number" placeholder="45" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="expiry">Expiry Date</Label>
-                  <Input id="expiry" type="date" />
+                <hr className="my-2" />
+                <Label className="text-sm font-medium text-muted-foreground">Batch Details</Label>
+                 <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input id="quantity" type="number" placeholder="45" value={newItem.quantity} onChange={handleFormChange} />
+                  </div>
+                   <div className="grid gap-2">
+                    <Label htmlFor="deliveryDate">Delivery Date</Label>
+                    <Input id="deliveryDate" type="date" value={newItem.deliveryDate} onChange={handleFormChange} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="expiryDate">Expiry Date</Label>
+                    <Input id="expiryDate" type="date" value={newItem.expiryDate} onChange={handleFormChange} />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -252,12 +355,7 @@ const Inventory = () => {
                 >
                   Cancel
                 </Button>
-                <Button
-                  onClick={() => {
-                    toast.success("Item added successfully");
-                    setIsAddDialogOpen(false);
-                  }}
-                >
+                <Button onClick={handleAddItem}>
                   Add Item
                 </Button>
               </DialogFooter>
@@ -274,14 +372,14 @@ const Inventory = () => {
                 <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2 border">
                   <Search className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by SKU, name, or category..."
+                    placeholder="Search by SKU or name..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.g.target.value)}
                     className="max-w-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
                   />
                 </div>
 
-                {/* Filters Row */}
+                {/* --- FILTERS ROW (MAPPED TO NEW STATUS) --- */}
                 <div className="flex flex-wrap items-center gap-4">
                   {/* Status Filter */}
                   <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2 border">
@@ -293,10 +391,9 @@ const Inventory = () => {
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="all">All Active</SelectItem>
+                        <SelectItem value="active">Active (Fresh)</SelectItem>
                         <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -375,7 +472,7 @@ const Inventory = () => {
 
                 {/* Results Count */}
                 <div className="text-sm text-muted-foreground">
-                  Showing {filteredItems.length} of {items.length} items
+                  Showing {items.length} of {totalItems} batches
                 </div>
               </div>
             </CardDescription>
@@ -389,6 +486,7 @@ const Inventory = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Quantity</TableHead>
+                    <TableHead>Delivery Date</TableHead>
                     <TableHead>Expiry Date</TableHead>
                     <TableHead>Days Left</TableHead>
                     <TableHead>Status</TableHead>
@@ -396,51 +494,7 @@ const Inventory = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.sku}</TableCell>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>{item.category}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>
-                        {new Date(item.expiryDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={
-                            getDaysUntilExpiry(item.expiryDate) < 0
-                              ? "text-destructive font-medium"
-                              : getDaysUntilExpiry(item.expiryDate) <= 3
-                              ? "text-warning font-medium"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {getDaysUntilExpiry(item.expiryDate)} days
-                        </span>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(item.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              toast.info("Edit functionality coming soon")
-                            }
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {renderTableBody()}
                 </TableBody>
               </Table>
             </div>
