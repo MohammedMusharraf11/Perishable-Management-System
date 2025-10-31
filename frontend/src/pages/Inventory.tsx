@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios"; 
+import axios from "axios";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 
 // API Base URL
-const API_URL = import.meta.env.VITE_API_URL; 
+const API_URL = "http://localhost:5000/api/inventory";
 
 // Updated interface to match v_active_inventory view
 interface InventoryItem {
@@ -109,10 +109,19 @@ const Inventory = () => {
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (startDate) params.append("startDate", format(startDate, "yyyy-MM-dd"));
       if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
-      
+
+      console.log('Fetching from:', `${API_URL}/stock`);
       const response = await axios.get(`${API_URL}/stock`, { params });
-      setItems(response.data.data);
-      setTotalItems(response.data.count);
+      console.log('Full Response:', response);
+      console.log('Response.data:', response.data);
+      console.log('Response.data.data:', response.data.data);
+
+      // Backend returns { data: [...], count: ... }
+      const inventoryData = response.data.data || [];
+      console.log('Setting items:', inventoryData);
+
+      setItems(inventoryData);
+      setTotalItems(response.data.count || 0);
     } catch (err) {
       console.error(err);
       const errorMessage = (err as any).response?.data?.message || "Failed to fetch inventory";
@@ -141,7 +150,7 @@ const Inventory = () => {
         return <Badge>{status}</Badge>;
     }
   };
-  
+
   // Helper: Clear filters
   const clearFilters = () => {
     setSearchTerm("");
@@ -181,13 +190,13 @@ const Inventory = () => {
       toast.error(errorMessage);
     }
   };
-  
+
   // Handle "Delete" button click
   const handleDelete = async (batch_id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete this batch of "${name}"?`)) {
       return;
     }
-    
+
     try {
       await axios.delete(`${API_URL}/stock/${batch_id}`); // Use batch_id (UUID)
       toast.success(`Batch of "${name}" deleted successfully`);
@@ -224,7 +233,7 @@ const Inventory = () => {
       );
     }
 
-    if (items.length === 0) {
+    if (!items || items.length === 0) {
       return (
         <TableRow>
           <TableCell colSpan={9} className="h-24 text-center">
@@ -234,10 +243,10 @@ const Inventory = () => {
       );
     }
 
-    return items.map((item) => {
+    return Array.isArray(items) && items.map((item) => {
       const daysLeft = item.days_until_expiry;
       return (
-        <TableRow key={item.batch_id}> 
+        <TableRow key={item.batch_id}>
           <TableCell className="font-medium">{item.sku}</TableCell>
           <TableCell>{item.product_name}</TableCell>
           <TableCell>{item.category}</TableCell>
@@ -254,8 +263,8 @@ const Inventory = () => {
                 daysLeft < 0
                   ? "text-destructive font-medium"
                   : daysLeft <= 3
-                  ? "text-warning font-medium"
-                  : "text-muted-foreground"
+                    ? "text-warning font-medium"
+                    : "text-muted-foreground"
               }
             >
               {daysLeft} days
@@ -326,19 +335,19 @@ const Inventory = () => {
                     <Label htmlFor="category">Category</Label>
                     <Input id="category" placeholder="Dairy" value={newItem.category} onChange={handleFormChange} />
                   </div>
-                   <div className="grid gap-2">
+                  <div className="grid gap-2">
                     <Label htmlFor="base_price">Base Price</Label>
                     <Input id="base_price" type="number" placeholder="60.00" value={newItem.base_price} onChange={handleFormChange} />
                   </div>
                 </div>
                 <hr className="my-2" />
                 <Label className="text-sm font-medium text-muted-foreground">Batch Details</Label>
-                 <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="quantity">Quantity</Label>
                     <Input id="quantity" type="number" placeholder="45" value={newItem.quantity} onChange={handleFormChange} />
                   </div>
-                   <div className="grid gap-2">
+                  <div className="grid gap-2">
                     <Label htmlFor="deliveryDate">Delivery Date</Label>
                     <Input id="deliveryDate" type="date" value={newItem.deliveryDate} onChange={handleFormChange} />
                   </div>
