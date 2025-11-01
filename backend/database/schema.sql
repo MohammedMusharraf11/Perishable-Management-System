@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+
 -- ============================================
 -- INDEXES for Performance Optimization
 -- ============================================

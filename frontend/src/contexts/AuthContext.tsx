@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { toast } from "sonner";
+
 interface User {
   id: string;
   email: string;
@@ -15,27 +17,11 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, role: "Manager" | "Staff") => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  getPendingManagers: () => User[]; // Changed to sync function for localStorage
+  approveManager: (managerEmail: string) => boolean; // Changed to sync function for localStorage
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock database for storing users (replace with actual backend)
-const getStoredUsers = (): User[] => {
-  return JSON.parse(localStorage.getItem("pms_users") || "[]");
-};
-
-const saveUserToStorage = (user: User) => {
-  const users = getStoredUsers();
-  const existingUserIndex = users.findIndex(u => u.email === user.email);
-  
-  if (existingUserIndex >= 0) {
-    users[existingUserIndex] = user;
-  } else {
-    users.push(user);
-  }
-  
-  localStorage.setItem("pms_users", JSON.stringify(users));
-};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -53,95 +39,195 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string, role?: string) => {
-  setIsLoading(true);
-  try {
-    // Check hardcoded admin credentials
-    if (email === "admin@pms.com" && password === "1234") {
-      const adminUser: User = {
-        id: "0",
-        email,
-        name: "Admin",
-        role: "Admin",
-        approvalStatus: "approved",
-      };
-      localStorage.setItem("pms_user", JSON.stringify(adminUser));
-      localStorage.setItem("pms_token", "mock-admin-token");
-      setUser(adminUser);
-      navigate("/admin");
-      return;
-    }
+    setIsLoading(true);
+    try {
+      // Check hardcoded admin credentials
+      if (email === "admin@pms.com" && password === "1234") {
+        const adminUser: User = {
+          id: "0",
+          email,
+          name: "Admin",
+          role: "Admin",
+          approvalStatus: "approved",
+        };
+        localStorage.setItem("pms_user", JSON.stringify(adminUser));
+        localStorage.setItem("pms_token", "mock-admin-token");
+        setUser(adminUser);
+        navigate("/admin");
+        return;
+      }
 
-    // Check stored users for regular users
-    const storedUsers = getStoredUsers();
-    const foundUser = storedUsers.find(u => u.email === email);
-    
-    if (!foundUser) {
-      throw new Error("User not found. Please check your credentials.");
-    }
+      // 🔹 Check if it's a Manager (in localStorage)
+      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
+      const managerUser = storedUsers.find((u: any) => 
+        u.email === email && u.password === password && u.role === "Manager"
+      );
 
-    // Check if manager is approved
-    if (foundUser.role === "Manager" && foundUser.approvalStatus !== "approved") {
-      throw new Error("Your manager account is pending admin approval.");
-    }
+      if (managerUser) {
+        // Manager found in localStorage
+        if (managerUser.approvalStatus !== "approved") {
+          throw new Error("Your manager account is pending admin approval.");
+        }
 
-    // Check password (in real app, this would be hashed)
-    // For demo, we'll accept any password for existing users
-    
-    const mockToken = "mock-jwt-token-" + Date.now();
-    localStorage.setItem("pms_user", JSON.stringify(foundUser));
-    localStorage.setItem("pms_token", mockToken);
-    setUser(foundUser);
+        // Store and redirect approved manager
+        const userObj: User = {
+          id: managerUser.id,
+          email: managerUser.email,
+          name: managerUser.name,
+          role: "Manager",
+          approvalStatus: "approved"
+        };
+        
+        localStorage.setItem("pms_user", JSON.stringify(userObj));
+        localStorage.setItem("pms_token", "jwt-token-" + Date.now());
+        setUser(userObj);
+        navigate("/dashboard");
+        return;
+      }
 
-    // FIXED: Redirect both Managers and Staff to dashboard
-    if (foundUser.role === "Admin") {
-      navigate("/admin");
-    } else {
-      navigate("/dashboard"); // Both Managers and Staff go here
+      // Staff email pattern validation
+      if (role === "Staff") {
+        const pattern = /^pms_(\d{3})@gmail\.com$/;
+        const match = email.match(pattern);
+        if (!match) throw new Error("Invalid Staff email format. Use pms_XXX@gmail.com");
+        const idNum = parseInt(match[1]);
+        if (idNum < 1 || idNum > 499) throw new Error("Staff ID must be between 001–499");
+      }
+
+      // 🔹 If not a manager, check Staff in database
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      // Store and redirect staff user
+      localStorage.setItem("pms_user", JSON.stringify(data.user));
+      localStorage.setItem("pms_token", "jwt-token-" + Date.now());
+      setUser(data.user);
+      navigate("/dashboard");
+
+    } catch (error: any) {
+      console.error("Login error:", error);
+      throw new Error(error.message || "Login failed. Please check your credentials.");
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error: any) {
-    console.error("Login error:", error);
-    throw new Error(error.message || "Login failed. Please check your credentials.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const register = async (name: string, email: string, password: string, role: "Manager" | "Staff") => {
     setIsLoading(true);
     try {
-      // Check if user already exists
-      const storedUsers = getStoredUsers();
-      if (storedUsers.find(u => u.email === email)) {
-        throw new Error("User with this email already exists.");
-      }
-
-      const newUser: User = {
-        id: String(Date.now()),
-        email,
-        name,
-        role,
-        approvalStatus: role === "Manager" ? "pending" : "approved",
-      };
-
-      // Save to mock database
-      saveUserToStorage(newUser);
-
-      // For staff, log them in automatically
       if (role === "Staff") {
-        const mockToken = "mock-jwt-token-" + Date.now();
-        localStorage.setItem("pms_user", JSON.stringify(newUser));
-        localStorage.setItem("pms_token", mockToken);
-        setUser(newUser);
-        navigate("/dashboard");
+        // 🔹 STAFF: Use backend register route (database)
+        const response = await fetch("http://localhost:5000/api/auth/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name, email, password, role }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Registration failed");
+        }
+
+        // Extract just the ID number from the message for display
+        const staffId = data.message.match(/Your Staff ID is: (\d+)/)?.[1];
+        if (staffId) {
+          toast.success(`Your Staff ID is: ${staffId}. Please contact admin for login credentials.`);
+        } else {
+          toast.success("Staff account created! Please contact admin for login credentials.");
+        }
+        navigate("/login");
       } else {
-        // For managers, don't auto-login, redirect to login page
+        // 🔹 MANAGER: Use localStorage for approval system
+        const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
+        
+        // Check if manager already exists
+        const existingManager = storedUsers.find((u: any) => u.email === email && u.role === "Manager");
+        if (existingManager) {
+          throw new Error("Manager with this email already exists.");
+        }
+
+        // Create manager object for localStorage
+        const newManager = {
+          id: Date.now().toString(),
+          name,
+          email,
+          password,
+          role: "Manager",
+          approvalStatus: "pending" as "pending",
+          createdAt: new Date().toISOString()
+        };
+
+        // Save to localStorage
+        storedUsers.push(newManager);
+        localStorage.setItem("pms_users", JSON.stringify(storedUsers));
+
+        toast.info("Manager account request submitted! Please wait for admin approval before login.");
         navigate("/login");
       }
-    } catch (error: any) {
-      console.error("Signup error:", error);
-      throw new Error(error.message || "Signup failed. Please try again.");
+    } catch (err: any) {
+      console.error("Signup error:", err);
+      toast.error(err.message || "Signup failed.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // NEW FUNCTION: Get pending managers from localStorage (sync)
+  const getPendingManagers = (): User[] => {
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
+      const pendingManagers = storedUsers.filter((u: any) => 
+        u.role === "Manager" && u.approvalStatus === "pending"
+      );
+      
+      // Convert to User interface format
+      return pendingManagers.map((manager: any) => ({
+        id: manager.id,
+        name: manager.name,
+        email: manager.email,
+        role: "Manager",
+        approvalStatus: "pending"
+      }));
+    } catch (error) {
+      console.error("Error fetching pending managers:", error);
+      toast.error("Failed to load pending managers");
+      return [];
+    }
+  };
+
+  // NEW FUNCTION: Approve a manager in localStorage (sync)
+  const approveManager = (managerEmail: string): boolean => {
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
+      
+      const updatedUsers = storedUsers.map((u: any) => {
+        if (u.email === managerEmail && u.role === "Manager") {
+          return { ...u, approvalStatus: "approved" };
+        }
+        return u;
+      });
+
+      localStorage.setItem("pms_users", JSON.stringify(updatedUsers));
+      toast.success("Manager approved successfully!");
+      return true;
+    } catch (error) {
+      console.error("Error approving manager:", error);
+      toast.error("Failed to approve manager");
+      return false;
     }
   };
 
@@ -153,7 +239,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      register, 
+      logout, 
+      isLoading,
+      getPendingManagers, // Add new functions
+      approveManager 
+    }}>
       {children}
     </AuthContext.Provider>
   );

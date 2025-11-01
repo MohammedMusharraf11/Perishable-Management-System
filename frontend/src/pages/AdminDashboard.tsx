@@ -11,6 +11,7 @@ interface PendingManager {
   email: string;
   role: string;
   approvalStatus: "pending" | "approved" | "rejected";
+  password?: string; // Include password for login
 }
 
 const AdminDashboard = () => {
@@ -18,9 +19,14 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [pendingManagers, setPendingManagers] = useState<PendingManager[]>([]);
 
-  // Get users from the correct localStorage key
+  // Get users from localStorage
   const getStoredUsers = (): PendingManager[] => {
     return JSON.parse(localStorage.getItem("pms_users") || "[]");
+  };
+
+  // Save users to localStorage
+  const saveStoredUsers = (users: PendingManager[]) => {
+    localStorage.setItem("pms_users", JSON.stringify(users));
   };
 
   useEffect(() => {
@@ -30,28 +36,33 @@ const AdminDashboard = () => {
       return;
     }
 
-    // Load pending managers from localStorage
+    loadPendingManagers();
+  }, [user, navigate]);
+
+  const loadPendingManagers = () => {
     const allUsers = getStoredUsers();
     const pending = allUsers.filter(
       (u: PendingManager) => u.role === "Manager" && u.approvalStatus === "pending"
     );
     setPendingManagers(pending);
-  }, [user, navigate]);
+    console.log("Loaded pending managers:", pending); // Debug log
+  };
 
-  const handleApproval = (email: string, status: "approved" | "rejected") => {
+  const handleApproval = (managerEmail: string, status: "approved" | "rejected") => {
     const allUsers = getStoredUsers();
 
     const updatedUsers = allUsers.map((u: PendingManager) => {
-      if (u.email === email) {
+      if (u.email === managerEmail) {
         return { ...u, approvalStatus: status };
       }
       return u;
     });
 
-    localStorage.setItem("pms_users", JSON.stringify(updatedUsers));
+    saveStoredUsers(updatedUsers);
 
-    setPendingManagers((prev) =>
-      prev.filter((u) => u.email !== email)
+    // Update local state
+    setPendingManagers(prev =>
+      prev.filter(manager => manager.email !== managerEmail)
     );
 
     toast.success(`Manager ${status === "approved" ? "approved" : "rejected"} successfully`);
@@ -61,28 +72,47 @@ const AdminDashboard = () => {
     navigate("/login");
   };
 
+  // Debug function to check what's in localStorage
+  const debugLocalStorage = () => {
+    const allUsers = getStoredUsers();
+    console.log("All users in localStorage:", allUsers);
+    const managers = allUsers.filter((u: PendingManager) => u.role === "Manager");
+    console.log("All managers:", managers);
+  };
+
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col items-center py-10 px-4">
       <Card className="w-full max-w-3xl">
         <CardHeader className="flex flex-row justify-between items-center">
           <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
-          <Button variant="outline" onClick={logout}>
-            Logout
-          </Button>
+          <div className="space-x-2">
+            <Button variant="outline" onClick={debugLocalStorage}>
+              Debug
+            </Button>
+            <Button variant="outline" onClick={logout}>
+              Logout
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent>
           <h2 className="text-lg font-semibold mb-4">Pending Manager Approvals</h2>
 
           {pendingManagers.length === 0 ? (
-            <p className="text-muted-foreground">No pending manager requests 🎉</p>
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-2">No pending manager requests 🎉</p>
+              <p className="text-sm text-muted-foreground">
+                When managers sign up, they will appear here for approval.
+              </p>
+            </div>
           ) : (
             <div className="space-y-4">
               {pendingManagers.map((manager) => (
-                <Card key={manager.id} className="p-4 flex justify-between items-center">
+                <Card key={manager.email} className="p-4 flex justify-between items-center">
                   <div>
                     <p className="font-medium">{manager.name}</p>
                     <p className="text-sm text-muted-foreground">{manager.email}</p>
+                    <p className="text-xs text-muted-foreground">Status: {manager.approvalStatus}</p>
                   </div>
                   <div className="space-x-2">
                     <Button
@@ -103,8 +133,16 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* ✅ Go back to login button */}
-          <div className="mt-6 text-center">
+          {/* Refresh and navigation buttons */}
+          <div className="mt-6 flex justify-between">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadPendingManagers}
+            >
+              Refresh List
+            </Button>
+            
             <Button
               variant="secondary"
               size="sm"

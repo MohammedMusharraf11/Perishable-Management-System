@@ -18,30 +18,23 @@ const Signup = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!name || !email || !password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
+  if (!name || !password) {
+    toast.error("Please fill in all fields");
+    return;
+  }
 
-    setIsLoading(true);
-    try {
-      // Register the user (backend should set approvalStatus: "pending" for Manager)
-      await register(name, email, password, role);
+  setIsLoading(true);
+  try {
+    await register(name, email, password, role);
+  } catch (error) {
+    toast.error("Signup failed. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-      if (role === "Manager") {
-        toast.info("Signup successful! Please wait for admin approval before you can log in.");
-      } else {
-        toast.success("Account created successfully!");
-        navigate("/dashboard");
-      }
-    } catch (error) {
-      toast.error("Signup failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
@@ -74,14 +67,15 @@ const Signup = () => {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="manager@store.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                required
-              />
+  id="email"
+  type="email"
+  placeholder={role === "Staff" ? "Auto-generated (pms_XXX@gmail.com)" : "manager@store.com"}
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  disabled={role === "Staff" || isLoading}
+  required={role !== "Staff"}
+/>
+
             </div>
 
             <div className="space-y-2">
