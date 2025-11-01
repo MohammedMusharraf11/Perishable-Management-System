@@ -39,6 +39,22 @@ const Login = () => {
       toast.error("Please fill in all fields");
       return;
     }
+      // 🔹 Staff-specific email validation
+  if (selectedRole === "Staff") {
+    const staffEmailPattern = /^pms_(\d{3})@gmail\.com$/;
+    const match = email.match(staffEmailPattern);
+
+    if (!match) {
+      toast.error("Invalid email format. Use format: pms_XXX@gmail.com (e.g., pms_001@gmail.com)");
+      return;
+    }
+
+    const num = parseInt(match[1], 10);
+    if (num < 1 || num > 499) {
+      toast.error("Staff ID must be between 001 and 499");
+      return;
+    }
+  }
 
     setIsLoading(true);
     try {
