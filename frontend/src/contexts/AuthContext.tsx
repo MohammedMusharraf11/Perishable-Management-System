@@ -145,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Extract just the ID number from the message for display
         const staffId = data.message.match(/Your Staff ID is: (\d+)/)?.[1];
         if (staffId) {
-          toast.success(`Your Staff ID is: ${staffId}. Please contact admin for login credentials.`);
+          toast.success(`Your Staff ID is: ${staffId}`);
         } else {
           toast.success("Staff account created! Please contact admin for login credentials.");
         }
