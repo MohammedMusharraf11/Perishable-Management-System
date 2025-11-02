@@ -69,8 +69,19 @@ const initialFormState = {
   category: "",
   base_price: 0,
   quantity: 0,
-  deliveryDate: "",
-  expiryDate: "",
+  deliveryDate: undefined as Date | undefined,
+  expiryDate: undefined as Date | undefined,
+  supplier_batch_number: "",
+};
+
+// State for Update Quantity modal
+const initialUpdateState = {
+  batchId: "",
+  productName: "",
+  currentQuantity: 0,
+  quantityChange: 0,
+  reason: "SALE",
+  notes: "",
 };
 
 const Inventory = () => {
@@ -89,7 +100,9 @@ const Inventory = () => {
 
   // State for dialogs
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState(initialFormState);
+  const [updateData, setUpdateData] = useState(initialUpdateState);
 
   // Debounce search term
   useEffect(() => {
@@ -171,12 +184,18 @@ const Inventory = () => {
 
   // Handle "Add Item" submission
   const handleAddItem = async () => {
+    // Validation
+    if (!newItem.deliveryDate || !newItem.expiryDate) {
+      toast.error("Please select both delivery and expiry dates");
+      return;
+    }
+
     try {
       // Map frontend state to backend API expectations
       const payload = {
         ...newItem,
-        deliveryDate: newItem.deliveryDate,
-        expiryDate: newItem.expiryDate,
+        deliveryDate: format(newItem.deliveryDate, "yyyy-MM-dd"),
+        expiryDate: format(newItem.expiryDate, "yyyy-MM-dd"),
       };
 
       await axios.post(`${API_URL}/stock`, payload);
@@ -187,6 +206,50 @@ const Inventory = () => {
     } catch (err) {
       console.error(err);
       const errorMessage = (err as any).response?.data?.message || "Failed to add item";
+      toast.error(errorMessage);
+    }
+  };
+
+  // Handle "Update Quantity" button click
+  const handleOpenUpdateDialog = (item: InventoryItem) => {
+    setUpdateData({
+      batchId: item.batch_id,
+      productName: item.product_name,
+      currentQuantity: item.quantity,
+      quantityChange: 0,
+      reason: "SALE",
+      notes: "",
+    });
+    setIsUpdateDialogOpen(true);
+  };
+
+  // Handle "Update Quantity" submission
+  const handleUpdateQuantity = async () => {
+    if (updateData.quantityChange === 0) {
+      toast.error("Please enter a quantity change");
+      return;
+    }
+
+    const newQuantity = updateData.currentQuantity + updateData.quantityChange;
+    if (newQuantity < 0) {
+      toast.error("Resulting quantity cannot be negative");
+      return;
+    }
+
+    try {
+      await axios.put(`${API_URL}/stock/${updateData.batchId}`, {
+        quantityChange: updateData.quantityChange,
+        reason: updateData.reason,
+        notes: updateData.notes,
+      });
+      
+      toast.success(`Quantity updated successfully for "${updateData.productName}"`);
+      setIsUpdateDialogOpen(false);
+      setUpdateData(initialUpdateState);
+      fetchInventory(); // Refetch data
+    } catch (err) {
+      console.error(err);
+      const errorMessage = (err as any).response?.data?.message || "Failed to update quantity";
       toast.error(errorMessage);
     }
   };
@@ -276,7 +339,8 @@ const Inventory = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => toast.info("Edit functionality coming soon")}
+                onClick={() => handleOpenUpdateDialog(item)}
+                title="Update Quantity"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -284,6 +348,7 @@ const Inventory = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDelete(item.batch_id, item.product_name)}
+                title="Delete Batch"
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
@@ -342,19 +407,62 @@ const Inventory = () => {
                 </div>
                 <hr className="my-2" />
                 <Label className="text-sm font-medium text-muted-foreground">Batch Details</Label>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="quantity">Quantity</Label>
                     <Input id="quantity" type="number" placeholder="45" value={newItem.quantity} onChange={handleFormChange} />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="deliveryDate">Delivery Date</Label>
-                    <Input id="deliveryDate" type="date" value={newItem.deliveryDate} onChange={handleFormChange} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Delivery Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`justify-start text-left font-normal ${!newItem.deliveryDate && "text-muted-foreground"}`}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {newItem.deliveryDate ? format(newItem.deliveryDate, "dd-MM-yyyy") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={newItem.deliveryDate}
+                            onSelect={(date) => setNewItem(prev => ({ ...prev, deliveryDate: date }))}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Expiry Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`justify-start text-left font-normal ${!newItem.expiryDate && "text-muted-foreground"}`}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {newItem.expiryDate ? format(newItem.expiryDate, "dd-MM-yyyy") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={newItem.expiryDate}
+                            onSelect={(date) => setNewItem(prev => ({ ...prev, expiryDate: date }))}
+                            initialFocus
+                            disabled={(date) => newItem.deliveryDate ? date < newItem.deliveryDate : false}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="expiryDate">Expiry Date</Label>
-                    <Input id="expiryDate" type="date" value={newItem.expiryDate} onChange={handleFormChange} />
-                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="supplier_batch_number">Supplier Batch Number (Optional)</Label>
+                  <Input id="supplier_batch_number" placeholder="BATCH-2025-001" value={newItem.supplier_batch_number} onChange={handleFormChange} />
                 </div>
               </div>
               <DialogFooter>
@@ -366,6 +474,75 @@ const Inventory = () => {
                 </Button>
                 <Button onClick={handleAddItem}>
                   Add Item
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* --- UPDATE QUANTITY DIALOG --- */}
+          <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Quantity</DialogTitle>
+                <DialogDescription>
+                  Adjust stock quantity for {updateData.productName}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label>Current Quantity</Label>
+                  <Input value={updateData.currentQuantity} disabled className="bg-muted" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="quantityChange">Quantity Change</Label>
+                  <Input 
+                    id="quantityChange" 
+                    type="number" 
+                    placeholder="Enter positive or negative number (e.g., -5 for sale, +10 for return)"
+                    value={updateData.quantityChange}
+                    onChange={(e) => setUpdateData(prev => ({ ...prev, quantityChange: parseInt(e.target.value) || 0 }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    New quantity will be: {updateData.currentQuantity + updateData.quantityChange}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="reason">Reason</Label>
+                  <Select 
+                    value={updateData.reason} 
+                    onValueChange={(value) => setUpdateData(prev => ({ ...prev, reason: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SALE">Sale</SelectItem>
+                      <SelectItem value="RETURN">Return</SelectItem>
+                      <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                      <SelectItem value="TRANSFER">Transfer</SelectItem>
+                      <SelectItem value="WASTE">Waste</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="notes">Notes (Optional)</Label>
+                  <Input 
+                    id="notes" 
+                    placeholder="Additional context..."
+                    value={updateData.notes}
+                    onChange={(e) => setUpdateData(prev => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsUpdateDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateQuantity}>
+                  Update Quantity
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -383,7 +560,7 @@ const Inventory = () => {
                   <Input
                     placeholder="Search by SKU or name..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.g.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="max-w-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
                   />
                 </div>

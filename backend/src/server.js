@@ -15,8 +15,11 @@ import express from 'express';
 import cors from 'cors';
 import inventoryRoutes from './routes/inventory_routes.js'; 
 import itemRoutes from './routes/item.routes.js';
+import auditRoutes from './routes/audit.routes.js';
+import cronRoutes from './routes/cron.routes.js';
 import publicEnvRouter from "./routes/publicENV.js";
 import { createClient } from '@supabase/supabase-js';
+import { startExpiryMonitorJob } from './jobs/expiryMonitor.job.js';
 
 
 
@@ -35,7 +38,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 // API Routes
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/items', itemRoutes); 
+app.use('/api/items', itemRoutes);
+app.use('/api/audit-logs', auditRoutes);
+app.use('/api/cron', cronRoutes); 
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -215,12 +220,114 @@ app.post('/api/admin/approve-manager', async (req, res) => {
 });
 
 
+// Helper function to list all registered routes
+const listRoutes = (app) => {
+  const routes = [];
+  
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      // Routes registered directly on the app
+      const methods = Object.keys(middleware.route.methods).map(m => m.toUpperCase()).join(', ');
+      routes.push({
+        method: methods,
+        path: middleware.route.path
+      });
+    } else if (middleware.name === 'router') {
+      // Routes registered via router
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          const methods = Object.keys(handler.route.methods).map(m => m.toUpperCase()).join(', ');
+          const basePath = middleware.regexp.source
+            .replace('\\/?', '')
+            .replace('(?=\\/|$)', '')
+            .replace(/\\\//g, '/')
+            .replace('^', '')
+            .replace('$', '');
+          routes.push({
+            method: methods,
+            path: basePath + handler.route.path
+          });
+        }
+      });
+    }
+  });
+  
+  return routes;
+};
+
 // Start server
 app.listen(PORT, () => {
+  console.log('\n' + '='.repeat(60));
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📡 Health check: http://localhost:${PORT}/health`);
   console.log(`✅ Supabase URL: ${process.env.SUPABASE_URL ? 'Loaded' : 'NOT LOADED'}`);
+  console.log('='.repeat(60));
+  
+  console.log('\n📡 Available API Endpoints:');
+  console.log('-'.repeat(60));
+  
+  const routes = listRoutes(app);
+  
+  // Group routes by category
+  const inventory = routes.filter(r => r.path.includes('/inventory'));
+  const items = routes.filter(r => r.path.includes('/items'));
+  const audit = routes.filter(r => r.path.includes('/audit'));
+  const cron = routes.filter(r => r.path.includes('/cron'));
+  const auth = routes.filter(r => r.path.includes('/auth'));
+  const admin = routes.filter(r => r.path.includes('/admin'));
+  const other = routes.filter(r => 
+    !r.path.includes('/inventory') && 
+    !r.path.includes('/items') && 
+    !r.path.includes('/audit') &&
+    !r.path.includes('/cron') &&
+    !r.path.includes('/auth') &&
+    !r.path.includes('/admin')
+  );
+  
+  if (inventory.length > 0) {
+    console.log('\n📦 Inventory Routes:');
+    inventory.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (items.length > 0) {
+    console.log('\n🏷️  Items Routes:');
+    items.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (audit.length > 0) {
+    console.log('\n📋 Audit Routes:');
+    audit.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (cron.length > 0) {
+    console.log('\n⏰ Cron/Jobs Routes:');
+    cron.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (auth.length > 0) {
+    console.log('\n🔐 Auth Routes:');
+    auth.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (admin.length > 0) {
+    console.log('\n👑 Admin Routes:');
+    admin.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (other.length > 0) {
+    console.log('\n🔧 Other Routes:');
+    other.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  console.log('\n' + '='.repeat(60));
+  console.log('✨ Server ready for requests!');
+  console.log('='.repeat(60) + '\n');
+  
+  // Start cron jobs
+  console.log('⏰ Initializing Scheduled Jobs...');
+  console.log('-'.repeat(60));
+  startExpiryMonitorJob();
+  console.log('-'.repeat(60) + '\n');
 });
 
 export default app;
