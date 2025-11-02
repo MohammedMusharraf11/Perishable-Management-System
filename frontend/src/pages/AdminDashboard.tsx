@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,15 @@ const AdminDashboard = () => {
     localStorage.setItem("pms_users", JSON.stringify(users));
   };
 
+  const loadPendingManagers = useCallback(() => {
+    const allUsers = getStoredUsers();
+    const pending = allUsers.filter(
+      (u: PendingManager) => u.role === "Manager" && u.approvalStatus === "pending"
+    );
+    setPendingManagers(pending);
+    console.log("Loaded pending managers:", pending); // Debug log
+  }, []);
+
   useEffect(() => {
     // Only allow Admin
     if (!user || user.role !== "Admin") {
@@ -37,16 +46,7 @@ const AdminDashboard = () => {
     }
 
     loadPendingManagers();
-  }, [user, navigate]);
-
-  const loadPendingManagers = () => {
-    const allUsers = getStoredUsers();
-    const pending = allUsers.filter(
-      (u: PendingManager) => u.role === "Manager" && u.approvalStatus === "pending"
-    );
-    setPendingManagers(pending);
-    console.log("Loaded pending managers:", pending); // Debug log
-  };
+  }, [user, navigate, loadPendingManagers]);
 
   const handleApproval = (managerEmail: string, status: "approved" | "rejected") => {
     const allUsers = getStoredUsers();

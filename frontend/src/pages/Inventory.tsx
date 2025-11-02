@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,7 +137,9 @@ const Inventory = () => {
       setTotalItems(response.data.count || 0);
     } catch (err) {
       console.error(err);
-      const errorMessage = (err as any).response?.data?.message || "Failed to fetch inventory";
+      const errorMessage = err instanceof AxiosError 
+        ? err.response?.data?.message || "Failed to fetch inventory"
+        : "Failed to fetch inventory";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -205,7 +207,9 @@ const Inventory = () => {
       fetchInventory(); // Refetch data to show new item
     } catch (err) {
       console.error(err);
-      const errorMessage = (err as any).response?.data?.message || "Failed to add item";
+      const errorMessage = err instanceof AxiosError 
+        ? err.response?.data?.message || "Failed to add item"
+        : "Failed to add item";
       toast.error(errorMessage);
     }
   };
@@ -249,7 +253,9 @@ const Inventory = () => {
       fetchInventory(); // Refetch data
     } catch (err) {
       console.error(err);
-      const errorMessage = (err as any).response?.data?.message || "Failed to update quantity";
+      const errorMessage = err instanceof AxiosError 
+        ? err.response?.data?.message || "Failed to update quantity"
+        : "Failed to update quantity";
       toast.error(errorMessage);
     }
   };
@@ -266,7 +272,9 @@ const Inventory = () => {
       fetchInventory(); // Refetch data
     } catch (err) {
       console.error(err);
-      const errorMessage = (err as any).response?.data?.message || "Failed to delete item";
+      const errorMessage = err instanceof AxiosError 
+        ? err.response?.data?.message || "Failed to delete item"
+        : "Failed to delete item";
       toast.error(errorMessage);
     }
   };
