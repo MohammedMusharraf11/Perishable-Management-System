@@ -4,104 +4,102 @@
  * Tests for the expiry monitoring service
  */
 
-/**
- * Test: Calculate days until expiry
- */
-const testDaysCalculation = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+import { describe, test, expect } from '@jest/globals';
 
-  const testCases = [
-    {
-      name: 'Expired item (yesterday)',
-      expiryDate: new Date(today.getTime() - 24 * 60 * 60 * 1000),
-      expectedDays: -1,
-      expectedAlert: 'EXPIRED'
-    },
-    {
-      name: 'Expiring today',
-      expiryDate: today,
-      expectedDays: 0,
-      expectedAlert: 'EXPIRING_TODAY'
-    },
-    {
-      name: 'Expiring in 1 day',
-      expiryDate: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-      expectedDays: 1,
-      expectedAlert: 'EXPIRING_1_DAY'
-    },
-    {
-      name: 'Expiring in 2 days',
-      expiryDate: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000),
-      expectedDays: 2,
-      expectedAlert: 'EXPIRING_2_DAYS'
-    },
-    {
-      name: 'Expiring in 3 days (no alert)',
-      expiryDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000),
-      expectedDays: 3,
-      expectedAlert: null
-    }
-  ];
+describe('Expiry Monitor Service', () => {
+  describe('Days Until Expiry Calculation', () => {
+    test('should return -1 for expired item (yesterday)', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiryDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      
+      const diffTime = expiryDate.getTime() - today.getTime();
+      const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      expect(daysUntilExpiry).toBe(-1);
+    });
 
-  console.log('🧪 Testing Expiry Calculation Logic\n');
-  
-  testCases.forEach(test => {
-    const diffTime = test.expiryDate.getTime() - today.getTime();
-    const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    const passed = daysUntilExpiry === test.expectedDays;
-    console.log(`${passed ? '✅' : '❌'} ${test.name}`);
-    console.log(`   Expected: ${test.expectedDays} days, Got: ${daysUntilExpiry} days`);
-    console.log(`   Alert Type: ${test.expectedAlert || 'None'}\n`);
+    test('should return 0 for item expiring today', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const diffTime = today.getTime() - today.getTime();
+      const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      expect(daysUntilExpiry).toBe(0);
+    });
+
+    test('should return 1 for item expiring in 1 day', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiryDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      
+      const diffTime = expiryDate.getTime() - today.getTime();
+      const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      expect(daysUntilExpiry).toBe(1);
+    });
+
+    test('should return 2 for item expiring in 2 days', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiryDate = new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000);
+      
+      const diffTime = expiryDate.getTime() - today.getTime();
+      const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      expect(daysUntilExpiry).toBe(2);
+    });
+
+    test('should return 3 for item expiring in 3 days', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiryDate = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+      
+      const diffTime = expiryDate.getTime() - today.getTime();
+      const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      expect(daysUntilExpiry).toBe(3);
+    });
   });
-};
 
-/**
- * Test: Status update logic
- */
-const testStatusUpdate = () => {
-  const testCases = [
-    { daysLeft: -1, expectedStatus: 'EXPIRED' },
-    { daysLeft: 0, expectedStatus: 'EXPIRING_SOON' },
-    { daysLeft: 1, expectedStatus: 'EXPIRING_SOON' },
-    { daysLeft: 2, expectedStatus: 'EXPIRING_SOON' },
-    { daysLeft: 3, expectedStatus: 'EXPIRING_SOON' },
-    { daysLeft: 4, expectedStatus: 'ACTIVE' },
-    { daysLeft: 7, expectedStatus: 'ACTIVE' }
-  ];
+  describe('Status Update Logic', () => {
+    const getStatus = (daysLeft) => {
+      if (daysLeft < 0) {
+        return 'EXPIRED';
+      } else if (daysLeft <= 3) {
+        return 'EXPIRING_SOON';
+      } else {
+        return 'ACTIVE';
+      }
+    };
 
-  console.log('🧪 Testing Status Update Logic\n');
-  
-  testCases.forEach(test => {
-    let status;
-    if (test.daysLeft < 0) {
-      status = 'EXPIRED';
-    } else if (test.daysLeft <= 3) {
-      status = 'EXPIRING_SOON';
-    } else {
-      status = 'ACTIVE';
-    }
-    
-    const passed = status === test.expectedStatus;
-    console.log(`${passed ? '✅' : '❌'} Days: ${test.daysLeft} → Status: ${status}`);
+    test('should return EXPIRED for negative days', () => {
+      expect(getStatus(-1)).toBe('EXPIRED');
+    });
+
+    test('should return EXPIRING_SOON for 0 days', () => {
+      expect(getStatus(0)).toBe('EXPIRING_SOON');
+    });
+
+    test('should return EXPIRING_SOON for 1 day', () => {
+      expect(getStatus(1)).toBe('EXPIRING_SOON');
+    });
+
+    test('should return EXPIRING_SOON for 2 days', () => {
+      expect(getStatus(2)).toBe('EXPIRING_SOON');
+    });
+
+    test('should return EXPIRING_SOON for 3 days', () => {
+      expect(getStatus(3)).toBe('EXPIRING_SOON');
+    });
+
+    test('should return ACTIVE for 4 days', () => {
+      expect(getStatus(4)).toBe('ACTIVE');
+    });
+
+    test('should return ACTIVE for 7 days', () => {
+      expect(getStatus(7)).toBe('ACTIVE');
+    });
   });
-  
-  console.log('');
-};
-
-// Run tests
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log('='.repeat(60));
-  console.log('Running Expiry Monitor Unit Tests');
-  console.log('='.repeat(60) + '\n');
-  
-  testDaysCalculation();
-  testStatusUpdate();
-  
-  console.log('='.repeat(60));
-  console.log('Tests Complete');
-  console.log('='.repeat(60));
-}
-
-export { testDaysCalculation, testStatusUpdate };
+});
