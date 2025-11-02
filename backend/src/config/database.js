@@ -13,10 +13,15 @@ const supabase = createClient(
 const testConnection = async () => {
   try {
     const { data, error } = await supabase.from('items').select('count').limit(1);
-    if (error) throw error;
-    return true;
+    if (error) {
+      console.error('Supabase connection test failed:', error.message);
+      throw new Error(`Database connection failed: ${error.message}`);
+    }
+    console.log('Database connection test successful');
+    return data;
   } catch (error) {
-    throw error;
+    console.error('Failed to test database connection:', error);
+    throw new Error('Unable to connect to database');
   }
 };
 
