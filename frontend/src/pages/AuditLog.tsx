@@ -3,13 +3,58 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
-import { Search, Clock, User, Package, DollarSign, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Search, Clock, User, Package, DollarSign, Trash2, Loader2, FileEdit } from "lucide-react";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { toast } from "sonner";
+import { format } from "date-fns";
+
+const API_URL = "http://localhost:5000/api/audit-logs";
+
+interface AuditLog {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  old_values: any;
+  new_values: any;
+  users?: {
+    username: string;
+    email: string;
+  };
+}
 
 const AuditLog = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const auditLogs = [
+  // Fetch audit logs from backend
+  useEffect(() => {
+    fetchAuditLogs();
+  }, []);
+
+  const fetchAuditLogs = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(API_URL, {
+        params: { limit: 100 }
+      });
+      setAuditLogs(response.data.data || []);
+      setTotalCount(response.data.count || 0);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch audit logs");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Mock data for fallback (keeping original structure)
+  const mockAuditLogs = [
     {
       id: 1,
       timestamp: "2025-01-23 14:32:15",
@@ -92,7 +137,44 @@ const AuditLog = () => {
     },
   ];
 
-  const filteredLogs = auditLogs.filter(
+  // Helper to get icon based on action
+  const getActionIcon = (action: string) => {
+    if (action.includes('QUANTITY') || action.includes('STOCK')) return Package;
+    if (action.includes('DISCOUNT') || action.includes('PRICING')) return DollarSign;
+    if (action.includes('DELETE')) return Trash2;
+    return FileEdit;
+  };
+
+  // Helper to format action name
+  const formatAction = (action: string) => {
+    return action.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Helper to get entity type display
+  const getEntityTypeDisplay = (entityType: string) => {
+    const typeMap: Record<string, string> = {
+      'stock_batches': 'inventory',
+      'items': 'inventory',
+      'transactions': 'inventory',
+      'discount_suggestions': 'pricing',
+      'waste_logs': 'waste'
+    };
+    return typeMap[entityType] || 'system';
+  };
+
+  // Convert real audit logs to display format
+  const displayLogs = auditLogs.map(log => ({
+    id: log.id,
+    timestamp: format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss"),
+    user: log.users?.username || log.users?.email || 'System',
+    action: formatAction(log.action),
+    target: log.new_values?.name || log.new_values?.sku || log.old_values?.sku || log.entity_type,
+    type: getEntityTypeDisplay(log.entity_type),
+    details: JSON.stringify(log.new_values || log.old_values || {}).substring(0, 100),
+    icon: getActionIcon(log.action),
+  }));
+
+  const filteredLogs = (displayLogs.length > 0 ? displayLogs : mockAuditLogs).filter(
     (log) =>
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,7 +208,7 @@ const AuditLog = () => {
           </div>
           <div className="glass px-4 py-2 rounded-full">
             <p className="text-sm text-muted-foreground">
-              Total Entries: <span className="font-bold text-foreground">{auditLogs.length}</span>
+              Total Entries: <span className="font-bold text-foreground">{totalCount || auditLogs.length}</span>
             </p>
           </div>
         </div>
@@ -143,10 +225,18 @@ const AuditLog = () => {
         </div>
 
         {/* Timeline */}
-        <div className="relative space-y-4">
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/50 to-transparent" />
+        {isLoading ? (
+          <Card className="glass">
+            <CardContent className="p-12 text-center">
+              <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Loading audit logs...</h3>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="relative space-y-4">
+            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/50 to-transparent" />
 
-          {filteredLogs.map((log, index) => {
+            {filteredLogs.map((log, index) => {
             const Icon = log.icon;
             return (
               <motion.div
@@ -191,9 +281,10 @@ const AuditLog = () => {
               </motion.div>
             );
           })}
-        </div>
+          </div>
+        )}
 
-        {filteredLogs.length === 0 && (
+        {!isLoading && filteredLogs.length === 0 && (
           <Card className="glass">
             <CardContent className="p-12 text-center">
               <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
