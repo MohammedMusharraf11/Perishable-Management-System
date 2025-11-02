@@ -58,8 +58,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // 🔹 Check if it's a Manager (in localStorage)
-      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
-      const managerUser = storedUsers.find((u: any) => 
+      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
+        id: string;
+        email: string;
+        password: string;
+        name: string;
+        role: string;
+        approvalStatus: string;
+      }>;
+      const managerUser = storedUsers.find((u) => 
         u.email === email && u.password === password && u.role === "Manager"
       );
 
@@ -115,9 +122,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(data.user);
       navigate("/dashboard");
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Login error:", error);
-      throw new Error(error.message || "Login failed. Please check your credentials.");
+      const errorMessage = error instanceof Error ? error.message : "Login failed. Please check your credentials.";
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -152,10 +160,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         navigate("/login");
       } else {
         // 🔹 MANAGER: Use localStorage for approval system
-        const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
+        const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
+          id: string;
+          email: string;
+          password: string;
+          name: string;
+          role: string;
+          approvalStatus: string;
+          createdAt?: string;
+        }>;
         
         // Check if manager already exists
-        const existingManager = storedUsers.find((u: any) => u.email === email && u.role === "Manager");
+        const existingManager = storedUsers.find((u) => u.email === email && u.role === "Manager");
         if (existingManager) {
           throw new Error("Manager with this email already exists.");
         }
@@ -167,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email,
           password,
           role: "Manager",
-          approvalStatus: "pending" as "pending",
+          approvalStatus: "pending" as const,
           createdAt: new Date().toISOString()
         };
 
@@ -178,9 +194,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast.info("Manager account request submitted! Please wait for admin approval before login.");
         navigate("/login");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Signup error:", err);
-      toast.error(err.message || "Signup failed.");
+      const errorMessage = err instanceof Error ? err.message : "Signup failed.";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -189,13 +206,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // NEW FUNCTION: Get pending managers from localStorage (sync)
   const getPendingManagers = (): User[] => {
     try {
-      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
-      const pendingManagers = storedUsers.filter((u: any) => 
+      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        approvalStatus: string;
+      }>;
+      const pendingManagers = storedUsers.filter((u) => 
         u.role === "Manager" && u.approvalStatus === "pending"
       );
       
       // Convert to User interface format
-      return pendingManagers.map((manager: any) => ({
+      return pendingManagers.map((manager) => ({
         id: manager.id,
         name: manager.name,
         email: manager.email,
@@ -212,9 +235,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // NEW FUNCTION: Approve a manager in localStorage (sync)
   const approveManager = (managerEmail: string): boolean => {
     try {
-      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]");
+      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
+        id: string;
+        email: string;
+        password: string;
+        name: string;
+        role: string;
+        approvalStatus: string;
+        createdAt?: string;
+      }>;
       
-      const updatedUsers = storedUsers.map((u: any) => {
+      const updatedUsers = storedUsers.map((u) => {
         if (u.email === managerEmail && u.role === "Manager") {
           return { ...u, approvalStatus: "approved" };
         }

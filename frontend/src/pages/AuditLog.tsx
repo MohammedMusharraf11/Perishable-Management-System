@@ -18,8 +18,8 @@ interface AuditLog {
   action: string;
   entity_type: string;
   entity_id: string;
-  old_values: any;
-  new_values: any;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
   users?: {
     username: string;
     email: string;
@@ -162,15 +162,55 @@ const AuditLog = () => {
     return typeMap[entityType] || 'system';
   };
 
+  // Helper to format details in a readable way
+  const formatDetails = (log: AuditLog) => {
+    const action = log.action.toUpperCase();
+    
+    if (action === 'STOCK_ADDED') {
+      const values = log.new_values as Record<string, unknown>;
+      return `Added ${values?.quantity || 'N/A'} units, SKU: ${values?.sku || 'N/A'}, Expires: ${values?.expiry_date || 'N/A'}`;
+    }
+    
+    if (action === 'QUANTITY_UPDATED') {
+      const values = log.new_values as Record<string, unknown>;
+      const oldValues = log.old_values as Record<string, unknown>;
+      return `Changed quantity from ${oldValues?.quantity || 'N/A'} to ${values?.quantity || 'N/A'} (Reason: ${values?.reason || 'N/A'})`;
+    }
+    
+    if (action === 'STOCK_DELETED') {
+      const values = log.old_values as Record<string, unknown>;
+      return `Removed ${values?.quantity || 'N/A'} units of SKU: ${values?.sku || 'N/A'}`;
+    }
+    
+    // Default: show key changes
+    if (log.new_values) {
+      const keys = Object.keys(log.new_values).slice(0, 3);
+      return keys.map(key => `${key}: ${log.new_values?.[key]}`).join(', ');
+    }
+    
+    return 'System action performed';
+  };
+
+  // Helper to get target name
+  const getTargetName = (log: AuditLog) => {
+    const newVals = log.new_values as Record<string, unknown>;
+    const oldVals = log.old_values as Record<string, unknown>;
+    
+    return (newVals?.name as string) || 
+           (newVals?.sku as string) || 
+           (oldVals?.sku as string) || 
+           log.entity_type.replace(/_/g, ' ');
+  };
+
   // Convert real audit logs to display format
   const displayLogs = auditLogs.map(log => ({
     id: log.id,
     timestamp: format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss"),
     user: log.users?.username || log.users?.email || 'System',
     action: formatAction(log.action),
-    target: log.new_values?.name || log.new_values?.sku || log.old_values?.sku || log.entity_type,
+    target: getTargetName(log),
     type: getEntityTypeDisplay(log.entity_type),
-    details: JSON.stringify(log.new_values || log.old_values || {}).substring(0, 100),
+    details: formatDetails(log),
     icon: getActionIcon(log.action),
   }));
 

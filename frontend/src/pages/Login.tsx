@@ -59,8 +59,11 @@ const Login = () => {
     setIsLoading(true);
     try {
       await login(email, password, selectedRole);
-    } catch (error: any) {
-      toast.error(error.message || "Login failed. Please check your credentials.");
+    } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Login failed. Please check your credentials.";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
