@@ -15,6 +15,7 @@ import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
 import Pricing from "./pages/Pricing";
 import Reports from "./pages/Reports";
+import WasteReport from "./pages/WasteReport";
 import AuditLog from "./pages/AuditLog";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -79,6 +80,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Reports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/waste-report"
+                element={
+                  <ProtectedRoute>
+                    <WasteReport />
                   </ProtectedRoute>
                 }
               />

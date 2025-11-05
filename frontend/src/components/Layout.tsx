@@ -11,6 +11,7 @@ import {
   DollarSign,
   BarChart3,
   FileText,
+  Trash2,
   User,
   LogOut,
 } from "lucide-react";
@@ -31,6 +32,7 @@ export const Layout = ({ children }: LayoutProps) => {
     { path: "/alerts", label: "Alerts", icon: AlertTriangle },
     { path: "/pricing", label: "Pricing", icon: DollarSign },
     { path: "/reports", label: "Reports", icon: BarChart3 },
+    { path: "/waste-report", label: "Waste Report", icon: Trash2 },
     { path: "/audit-log", label: "Audit Log", icon: FileText },
   ];
 
