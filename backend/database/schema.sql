@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS waste_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+
 -- ============================================
 -- TABLE: alerts
 -- Stores system-generated alerts for expiring items

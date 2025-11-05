@@ -74,6 +74,7 @@ const initialFormState = {
   supplier_batch_number: "",
 };
 
+
 // State for Update Quantity modal
 const initialUpdateState = {
   batchId: "",
@@ -102,7 +103,20 @@ const Inventory = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState(initialFormState);
+ 
   const [updateData, setUpdateData] = useState(initialUpdateState);
+ 
+  const [isWasteDialogOpen, setIsWasteDialogOpen] = useState(false);
+  const [wasteData, setWasteData] = useState({
+   batchId: "",
+   productName: "",
+   currentQuantity: 0,
+   quantityToWaste: 0,
+   reason: "EXPIRED",
+   notes: "",
+   basePrice: 0,
+});
+
 
   // Debounce search term
   useEffect(() => {
@@ -175,6 +189,20 @@ const Inventory = () => {
     toast.info("Filters cleared");
   };
 
+  const handleOpenWasteDialog = (item: any) => {
+  setWasteData({
+    batchId: item.batch_id,
+    productName: item.product_name,
+    currentQuantity: item.quantity,
+    quantityToWaste: 0,
+    reason: "EXPIRED",
+    notes: "",
+    basePrice: item.base_price || 0,
+  });
+  setIsWasteDialogOpen(true);
+};
+
+
   // Handle input change for the "Add Item" dialog
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -214,6 +242,60 @@ const Inventory = () => {
     }
   };
 
+
+  const handleMarkAsWaste = async () => {
+  if (wasteData.quantityToWaste <= 0) {
+    toast.error("Please enter a valid waste quantity.");
+    return;
+  }
+
+  if (wasteData.quantityToWaste > wasteData.currentQuantity) {
+    toast.error("Waste quantity cannot exceed current stock.");
+    return;
+  }
+
+  try {
+    const currentUser = JSON.parse(localStorage.getItem("pms_user") || "{}");
+    
+    // Detailed debugging
+    console.log("=== WASTE MARKING DEBUG ===");
+    console.log("Batch ID:", wasteData.batchId);
+    console.log("Quantity:", wasteData.quantityToWaste);
+    console.log("Reason:", wasteData.reason);
+    console.log("User ID:", currentUser.id);
+    console.log("User Object:", currentUser);
+    console.log("API_URL:", API_URL);
+    
+    const url = `${API_URL}/waste/${wasteData.batchId}`;
+    console.log("Full URL:", url);
+
+    const response = await axios.put(url, {
+      reason: wasteData.reason,
+      quantity: wasteData.quantityToWaste,
+      notes: wasteData.notes,
+      user_id: currentUser.id,
+      user_email: currentUser.email,    // Make sure this is sent
+      user_role: currentUser.role,
+    });
+
+    console.log("Success Response:", response.data);
+    
+    toast.success(
+      `${wasteData.quantityToWaste} units of "${wasteData.productName}" marked as waste (${wasteData.reason}). Estimated loss: ₹${response.data.estimated_loss}`
+    );
+
+    setIsWasteDialogOpen(false);
+    fetchInventory();
+  } catch (err: any) {
+    console.log("=== ERROR DETAILS ===");
+    console.log("Error message:", err.message);
+    console.log("Error response:", err.response);
+    console.log("Error data:", err.response?.data);
+    console.log("Error status:", err.response?.status);
+    
+    toast.error(`Failed to mark item as waste: ${err.response?.data?.message || err.message}`);
+  }
+};
   // Handle "Update Quantity" button click
   const handleOpenUpdateDialog = (item: InventoryItem) => {
     setUpdateData({
@@ -352,6 +434,16 @@ const Inventory = () => {
               >
                 <Edit className="h-4 w-4" />
               </Button>
+
+              <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleOpenWasteDialog(item)}
+          title="Mark as Waste"
+          >
+                 🗑️
+              </Button>
+
               <Button
                 variant="ghost"
                 size="icon"
@@ -556,6 +648,76 @@ const Inventory = () => {
             </DialogContent>
           </Dialog>
         </div>
+
+          <Dialog open={isWasteDialogOpen} onOpenChange={setIsWasteDialogOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Mark as Waste</DialogTitle>
+      <DialogDescription>
+        Remove expired or damaged stock for {wasteData.productName}
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="grid gap-4 py-4">
+      <div className="grid gap-2">
+        <Label>Current Quantity</Label>
+        <Input value={wasteData.currentQuantity} disabled className="bg-muted" />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Waste Quantity</Label>
+        <Input
+          type="number"
+          placeholder="Enter quantity to mark as waste"
+          value={wasteData.quantityToWaste}
+          onChange={(e) =>
+            setWasteData({ ...wasteData, quantityToWaste: parseInt(e.target.value) || 0 })
+          }
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Reason</Label>
+        <Select
+          value={wasteData.reason}
+          onValueChange={(value) => setWasteData({ ...wasteData, reason: value })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="EXPIRED">Expired</SelectItem>
+            <SelectItem value="DAMAGED">Damaged</SelectItem>
+            <SelectItem value="SPOILED">Spoiled</SelectItem>
+            <SelectItem value="OTHER">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Notes (optional)</Label>
+        <Input
+          placeholder="Add any additional details..."
+          value={wasteData.notes}
+          onChange={(e) => setWasteData({ ...wasteData, notes: e.target.value })}
+        />
+      </div>
+
+      {wasteData.quantityToWaste > 0 && (
+        <div className="text-sm text-muted-foreground">
+          Estimated Loss: ₹{(wasteData.quantityToWaste * wasteData.basePrice).toFixed(2)}
+        </div>
+      )}
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setIsWasteDialogOpen(false)}>
+        Cancel
+      </Button>
+      <Button onClick={handleMarkAsWaste}>Confirm Waste</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
         <Card>
           <CardHeader>
