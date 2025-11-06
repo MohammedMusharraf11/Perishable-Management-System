@@ -217,3 +217,173 @@ export const getSummaryReport = async (req, res) => {
     });
   }
 };
+
+/**
+ * [PMS-T-093, PMS-T-094] GET /api/reports/dashboard
+ * Get KPI metrics for Manager Dashboard
+ * Query params: startDate, endDate (optional, defaults to last 7 days)
+ */
+export const getDashboardKPIs = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    // Default to last 7 days if not provided
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
+
+    // KPI 1: Total waste value (this week/selected period)
+    const { data: wasteData, error: wasteError } = await supabase
+      .from('waste_logs')
+      .select(`
+        quantity,
+        estimated_loss,
+        created_at,
+        items (
+          base_price
+        )
+      `)
+      .gte('created_at', startISO)
+      .lte('created_at', endISO);
+
+    if (wasteError) throw wasteError;
+
+    const totalWasteValue = wasteData.reduce((sum, w) => {
+      const loss = w.estimated_loss || (w.items?.base_price ? w.quantity * w.items.base_price : 0);
+      return sum + loss;
+    }, 0);
+
+    // Calculate daily waste trend for charts
+    const dailyWasteTrend = {};
+    wasteData.forEach(w => {
+      const date = new Date(w.created_at).toISOString().split('T')[0];
+      const loss = w.estimated_loss || (w.items?.base_price ? w.quantity * w.items.base_price : 0);
+      
+      if (!dailyWasteTrend[date]) {
+        dailyWasteTrend[date] = { date, value: 0, count: 0 };
+      }
+      dailyWasteTrend[date].value += loss;
+      dailyWasteTrend[date].count += 1;
+    });
+
+    const wasteTrendArray = Object.values(dailyWasteTrend).sort((a, b) => 
+      new Date(a.date) - new Date(b.date)
+    );
+
+    // KPI 2: Items expiring today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: expiringToday, error: expiringError } = await supabase
+      .from('stock_batches')
+      .select('id, quantity, item_id')
+      .eq('expiry_date', today)
+      .in('status', ['ACTIVE', 'EXPIRING_SOON'])
+      .gt('quantity', 0);
+
+    if (expiringError) throw expiringError;
+
+    const itemsExpiringToday = expiringToday.length;
+
+    // KPI 3: Active discounts
+    const { data: activeDiscounts, error: discountError } = await supabase
+      .from('stock_batches')
+      .select('id, current_discount_percentage')
+      .in('status', ['ACTIVE', 'EXPIRING_SOON'])
+      .gt('current_discount_percentage', 0)
+      .gt('quantity', 0);
+
+    if (discountError) throw discountError;
+
+    const activeDiscountsCount = activeDiscounts.length;
+
+    // KPI 4: Inventory turnover rate
+    // Calculate as: (Cost of Goods Sold / Average Inventory Value)
+    // Simplified: Total sales in period / Current inventory value
+    const { data: transactions, error: transError } = await supabase
+      .from('transactions')
+      .select('quantity_change, created_at')
+      .eq('transaction_type', 'SALE')
+      .gte('created_at', startISO)
+      .lte('created_at', endISO);
+
+    if (transError) throw transError;
+
+    const totalSalesQuantity = transactions.reduce((sum, t) => 
+      sum + Math.abs(t.quantity_change), 0
+    );
+
+    const { data: currentInventory, error: invError } = await supabase
+      .from('stock_batches')
+      .select('quantity')
+      .in('status', ['ACTIVE', 'EXPIRING_SOON'])
+      .gt('quantity', 0);
+
+    if (invError) throw invError;
+
+    const totalInventoryQuantity = currentInventory.reduce((sum, i) => 
+      sum + i.quantity, 0
+    );
+
+    const inventoryTurnoverRate = totalInventoryQuantity > 0 
+      ? ((totalSalesQuantity / totalInventoryQuantity) * 100).toFixed(1)
+      : 0;
+
+    // KPI 5: Revenue from discounts
+    // Calculate revenue from discounted items sold
+    const { data: discountedSales, error: discSalesError } = await supabase
+      .from('transactions')
+      .select(`
+        quantity_change,
+        batch_id,
+        stock_batches (
+          current_discount_percentage,
+          item_id,
+          items (
+            base_price
+          )
+        )
+      `)
+      .eq('transaction_type', 'SALE')
+      .gte('created_at', startISO)
+      .lte('created_at', endISO);
+
+    if (discSalesError) throw discSalesError;
+
+    const revenueFromDiscounts = discountedSales.reduce((sum, t) => {
+      const batch = t.stock_batches;
+      if (batch && batch.current_discount_percentage > 0 && batch.items) {
+        const discountedPrice = batch.items.base_price * (1 - batch.current_discount_percentage / 100);
+        const revenue = Math.abs(t.quantity_change) * discountedPrice;
+        return sum + revenue;
+      }
+      return sum;
+    }, 0);
+
+    // Response with all KPIs
+    res.status(200).json({
+      success: true,
+      dateRange: {
+        startDate: start.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0]
+      },
+      kpis: {
+        totalWasteValue: parseFloat(totalWasteValue.toFixed(2)),
+        itemsExpiringToday,
+        activeDiscounts: activeDiscountsCount,
+        inventoryTurnoverRate: parseFloat(inventoryTurnoverRate),
+        revenueFromDiscounts: parseFloat(revenueFromDiscounts.toFixed(2))
+      },
+      trends: {
+        dailyWaste: wasteTrendArray
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generating dashboard KPIs:', error);
+    res.status(500).json({ 
+      message: 'Error generating dashboard KPIs', 
+      error: error.message 
+    });
+  }
+};

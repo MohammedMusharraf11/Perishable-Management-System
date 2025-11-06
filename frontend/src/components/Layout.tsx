@@ -27,7 +27,8 @@ export const Layout = ({ children }: LayoutProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   const allNavItems = [
-    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, excludeRole: "Manager" },
+    { path: "/manager", label: "Dashboard", icon: LayoutDashboard, requiredRole: "Manager" },
     { path: "/inventory", label: "Inventory", icon: Package },
     { path: "/alerts", label: "Alerts", icon: AlertTriangle },
     { path: "/pricing", label: "Pricing", icon: DollarSign },
@@ -41,6 +42,9 @@ export const Layout = ({ children }: LayoutProps) => {
     if (item.requiredRole) {
       return user?.role === item.requiredRole;
     }
+    if (item.excludeRole) {
+      return user?.role !== item.excludeRole;
+    }
     return true;
   });
 
@@ -53,7 +57,7 @@ export const Layout = ({ children }: LayoutProps) => {
         className="glass border-b border-border/50 sticky top-0 z-50 backdrop-blur-xl"
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2 group">
+          <Link to={user?.role === "Manager" ? "/manager" : "/dashboard"} className="flex items-center gap-2 group">
             <div className="p-2 rounded-xl gradient-primary shadow-glow group-hover:scale-110 transition-transform">
               <Package className="h-5 w-5 text-white" />
             </div>
