@@ -26,15 +26,23 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navItems = [
+  const allNavItems = [
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { path: "/inventory", label: "Inventory", icon: Package },
     { path: "/alerts", label: "Alerts", icon: AlertTriangle },
     { path: "/pricing", label: "Pricing", icon: DollarSign },
     { path: "/reports", label: "Reports", icon: BarChart3 },
-    { path: "/waste-report", label: "Waste Report", icon: Trash2 },
+    { path: "/waste-report", label: "Waste Report", icon: Trash2, requiredRole: "Manager" },
     { path: "/audit-log", label: "Audit Log", icon: FileText },
   ];
+
+  // Filter nav items based on user role
+  const navItems = allNavItems.filter((item) => {
+    if (item.requiredRole) {
+      return user?.role === item.requiredRole;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen flex flex-col">
