@@ -17,6 +17,7 @@ import inventoryRoutes from './routes/inventory_routes.js';
 import itemRoutes from './routes/item.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import cronRoutes from './routes/cron.routes.js';
+import reportRoutes from './routes/report.routes.js';
 import publicEnvRouter from "./routes/publicENV.js";
 import { createClient } from '@supabase/supabase-js';
 import { startExpiryMonitorJob } from './jobs/expiryMonitor.job.js';
@@ -40,7 +41,8 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/audit-logs', auditRoutes);
-app.use('/api/cron', cronRoutes); 
+app.use('/api/cron', cronRoutes);
+app.use('/api/reports', reportRoutes); 
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -273,6 +275,7 @@ app.listen(PORT, () => {
   const items = routes.filter(r => r.path.includes('/items'));
   const audit = routes.filter(r => r.path.includes('/audit'));
   const cron = routes.filter(r => r.path.includes('/cron'));
+  const reports = routes.filter(r => r.path.includes('/reports'));
   const auth = routes.filter(r => r.path.includes('/auth'));
   const admin = routes.filter(r => r.path.includes('/admin'));
   const other = routes.filter(r => 
@@ -280,6 +283,7 @@ app.listen(PORT, () => {
     !r.path.includes('/items') && 
     !r.path.includes('/audit') &&
     !r.path.includes('/cron') &&
+    !r.path.includes('/reports') &&
     !r.path.includes('/auth') &&
     !r.path.includes('/admin')
   );
@@ -302,6 +306,11 @@ app.listen(PORT, () => {
   if (cron.length > 0) {
     console.log('\n⏰ Cron/Jobs Routes:');
     cron.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (reports.length > 0) {
+    console.log('\n📊 Report Routes:');
+    reports.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
   }
   
   if (auth.length > 0) {
