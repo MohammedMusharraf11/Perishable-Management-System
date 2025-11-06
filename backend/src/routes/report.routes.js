@@ -1,5 +1,5 @@
 import express from 'express';
-import { getWasteReport, getSummaryReport } from '../controllers/report.controller.js';
+import { getWasteReport, getSummaryReport, getDashboardKPIs } from '../controllers/report.controller.js';
 
 const router = express.Router();
 
@@ -8,5 +8,8 @@ router.get('/waste', getWasteReport);
 
 // GET /api/reports/summary - Get summary statistics
 router.get('/summary', getSummaryReport);
+
+// [PMS-T-093] GET /api/reports/dashboard - Get dashboard KPIs for managers
+router.get('/dashboard', getDashboardKPIs);
 
 export default router;

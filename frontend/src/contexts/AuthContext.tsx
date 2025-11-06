@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem("pms_user", JSON.stringify(userObj));
         localStorage.setItem("pms_token", "jwt-token-" + Date.now());
         setUser(userObj);
-        navigate("/dashboard");
+        navigate("/manager");
         return;
       }
 
