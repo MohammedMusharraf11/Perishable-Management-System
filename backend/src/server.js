@@ -17,6 +17,19 @@ import inventoryRoutes from "./routes/inventory_routes.js";
 import itemRoutes from "./routes/item.routes.js";
 import auditRoutes from "./routes/audit.routes.js";
 import cronRoutes from "./routes/cron.routes.js";
+// 2. Go up two levels to the project root (from /backend/src to /)
+const projectRoot = path.resolve(__dirname, '..', '..');
+// 3. Load the .env file from the root
+dotenv.config({ path: path.join(projectRoot, '.env') });
+// --- End of new loading ---
+
+import express from 'express';
+import cors from 'cors';
+import inventoryRoutes from './routes/inventory_routes.js'; 
+import itemRoutes from './routes/item.routes.js';
+import auditRoutes from './routes/audit.routes.js';
+import cronRoutes from './routes/cron.routes.js';
+import reportRoutes from './routes/report.routes.js';
 import publicEnvRouter from "./routes/publicENV.js";
 import alertRoutes from "./routes/alert_routes.js"; // ✅ new alerts route
 
@@ -54,6 +67,14 @@ app.use("/api/cron", cronRoutes);
 // Health Check
 // ----------------------------
 app.get("/health", (req, res) => {
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/items', itemRoutes);
+app.use('/api/audit-logs', auditRoutes);
+app.use('/api/cron', cronRoutes);
+app.use('/api/reports', reportRoutes); 
+
+// Health check endpoint
+app.get('/health', (req, res) => {
   res.status(200).json({
     status: "OK",
     message: "Server is running",
@@ -303,6 +324,71 @@ app.listen(PORT, () => {
         )
       );
     }
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ Supabase URL: ${process.env.SUPABASE_URL ? 'Loaded' : 'NOT LOADED'}`);
+  console.log('='.repeat(60));
+  
+  console.log('\n📡 Available API Endpoints:');
+  console.log('-'.repeat(60));
+  
+  const routes = listRoutes(app);
+  
+  // Group routes by category
+  const inventory = routes.filter(r => r.path.includes('/inventory'));
+  const items = routes.filter(r => r.path.includes('/items'));
+  const audit = routes.filter(r => r.path.includes('/audit'));
+  const cron = routes.filter(r => r.path.includes('/cron'));
+  const reports = routes.filter(r => r.path.includes('/reports'));
+  const auth = routes.filter(r => r.path.includes('/auth'));
+  const admin = routes.filter(r => r.path.includes('/admin'));
+  const other = routes.filter(r => 
+    !r.path.includes('/inventory') && 
+    !r.path.includes('/items') && 
+    !r.path.includes('/audit') &&
+    !r.path.includes('/cron') &&
+    !r.path.includes('/reports') &&
+    !r.path.includes('/auth') &&
+    !r.path.includes('/admin')
+  );
+  
+  if (inventory.length > 0) {
+    console.log('\n📦 Inventory Routes:');
+    inventory.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (items.length > 0) {
+    console.log('\n🏷️  Items Routes:');
+    items.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (audit.length > 0) {
+    console.log('\n📋 Audit Routes:');
+    audit.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (cron.length > 0) {
+    console.log('\n⏰ Cron/Jobs Routes:');
+    cron.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (reports.length > 0) {
+    console.log('\n📊 Report Routes:');
+    reports.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (auth.length > 0) {
+    console.log('\n🔐 Auth Routes:');
+    auth.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (admin.length > 0) {
+    console.log('\n👑 Admin Routes:');
+    admin.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
+  }
+  
+  if (other.length > 0) {
+    console.log('\n🔧 Other Routes:');
+    other.forEach(r => console.log(`   ${r.method.padEnd(7)} http://localhost:${PORT}${r.path}`));
   }
 
   console.log("\n" + "=".repeat(60));
