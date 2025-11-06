@@ -16,25 +16,24 @@ export const getWasteReport = async (req, res) => {
       });
     }
 
-    // [PMS-T-088] Query transactions with WASTE reason within date range
+    // [PMS-T-088] Query waste_logs table within date range
     let query = supabase
-      .from('transactions')
+      .from('waste_logs')
       .select(`
         *,
         stock_batches (
           id,
           expiry_date,
-          delivery_date,
-          items (
-            id,
-            sku,
-            name,
-            category,
-            base_price
-          )
+          delivery_date
+        ),
+        items (
+          id,
+          sku,
+          name,
+          category,
+          base_price
         )
       `)
-      .eq('transaction_type', 'WASTE')
       .gte('created_at', startDate)
       .lte('created_at', endDate)
       .order('created_at', { ascending: false });
@@ -55,13 +54,13 @@ export const getWasteReport = async (req, res) => {
     const categoryBreakdown = {};
     const dailyWaste = {};
 
-    wasteTransactions.forEach(transaction => {
-      const item = transaction.stock_batches?.items;
-      const quantity = Math.abs(transaction.quantity_change);
-      const loss = item ? quantity * item.base_price : 0;
-      const reason = transaction.reason || 'WASTE';
+    wasteTransactions.forEach(wasteLog => {
+      const item = wasteLog.items;
+      const quantity = wasteLog.quantity;
+      const loss = wasteLog.estimated_loss || (item ? quantity * item.base_price : 0);
+      const reason = wasteLog.waste_reason || 'OTHER';
       const category = item?.category || 'Uncategorized';
-      const date = new Date(transaction.created_at).toISOString().split('T')[0];
+      const date = new Date(wasteLog.created_at).toISOString().split('T')[0];
 
       totalItemsWasted += 1;
       totalQuantity += quantity;
@@ -93,17 +92,17 @@ export const getWasteReport = async (req, res) => {
 
       // Add to detailed items list
       detailedItems.push({
-        id: transaction.id,
-        date: transaction.created_at,
+        id: wasteLog.id,
+        date: wasteLog.created_at,
         sku: item?.sku || 'N/A',
         name: item?.name || 'Unknown Item',
         category: category,
         quantity: quantity,
         reason: reason,
         loss: loss,
-        notes: transaction.notes,
-        batchId: transaction.batch_id,
-        expiryDate: transaction.stock_batches?.expiry_date
+        notes: wasteLog.notes,
+        batchId: wasteLog.batch_id,
+        expiryDate: wasteLog.stock_batches?.expiry_date
       });
     });
 
@@ -184,23 +183,21 @@ export const getSummaryReport = async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const { data: recentWaste, error: wasteError } = await supabase
-      .from('transactions')
+      .from('waste_logs')
       .select(`
-        quantity_change,
-        stock_batches (
-          items (
-            base_price
-          )
+        quantity,
+        estimated_loss,
+        items (
+          base_price
         )
       `)
-      .eq('transaction_type', 'WASTE')
       .gte('created_at', thirtyDaysAgo.toISOString());
 
     if (wasteError) throw wasteError;
 
-    const wasteValue = recentWaste.reduce((sum, t) => {
-      const price = t.stock_batches?.items?.base_price || 0;
-      return sum + (Math.abs(t.quantity_change) * price);
+    const wasteValue = recentWaste.reduce((sum, w) => {
+      const loss = w.estimated_loss || (w.items?.base_price ? w.quantity * w.items.base_price : 0);
+      return sum + loss;
     }, 0);
 
     res.status(200).json({

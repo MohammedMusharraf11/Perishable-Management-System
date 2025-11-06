@@ -86,7 +86,7 @@ const App = () => (
               <Route
                 path="/waste-report"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="Manager">
                     <WasteReport />
                   </ProtectedRoute>
                 }
