@@ -4,7 +4,11 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimitLogin } from "./middleware/auth.middleware.js";
 
 // Jobs
 import { startExpiryMonitorJob } from "./jobs/expiryMonitor.job.js";
@@ -43,6 +47,72 @@ const supabase = createClient(
 
 // ======================================================
 // Middleware
+// ----------------------------
+
+// Security headers with helmet.js (PMS-T-107)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  xssFilter: true,
+}));
+
+// CORS configuration with whitelist
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:8080',
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Body parsing with size limits to prevent DoS
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request sanitization - prevent XSS
+app.use((req, res, next) => {
+  // Sanitize request body
+  if (req.body) {
+    Object.keys(req.body).forEach(key => {
+      if (typeof req.body[key] === 'string') {
+        // Remove potential XSS patterns
+        req.body[key] = req.body[key]
+          .replace(/<script[^>]*>.*?<\/script>/gi, '')
+          .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+\s*=/gi, '');
+      }
+    });
+  }
+  next();
+});
 // ======================================================
 app.use(cors());
 app.use(express.json());
