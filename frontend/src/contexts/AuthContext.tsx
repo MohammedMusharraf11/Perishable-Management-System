@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { toast } from "sonner";
 
 interface User {
@@ -9,6 +8,7 @@ interface User {
   name: string;
   role: "Manager" | "Staff" | "Admin";
   approvalStatus?: "pending" | "approved";
+  is_active?: boolean;
 }
 
 interface AuthContextType {
@@ -17,8 +17,14 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, role: "Manager" | "Staff") => Promise<void>;
   logout: () => void;
   isLoading: boolean;
-  getPendingManagers: () => User[]; // Changed to sync function for localStorage
-  approveManager: (managerEmail: string) => boolean; // Changed to sync function for localStorage
+  getPendingManagers: () => Promise<User[]>; // Changed back to async for DB
+  approveManager: (managerId: string) => Promise<boolean>; // Changed back to async for DB
+  // New user management functions
+  getAllUsers: () => Promise<User[]>;
+  createUser: (userData: { name: string; email: string; password: string; role: "Manager" | "Staff" }) => Promise<any>;
+  updateUserStatus: (userId: string, isActive: boolean) => Promise<boolean>;
+  resetUserPassword: (userId: string, newPassword: string) => Promise<boolean>;
+  editUser: (userId: string, userData: { name: string }) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,46 +55,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: "Admin",
           role: "Admin",
           approvalStatus: "approved",
+          is_active: true,
         };
         localStorage.setItem("pms_user", JSON.stringify(adminUser));
         localStorage.setItem("pms_token", "mock-admin-token");
         setUser(adminUser);
         navigate("/admin");
-        return;
-      }
-
-      // 🔹 Check if it's a Manager (in localStorage)
-      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
-        id: string;
-        email: string;
-        password: string;
-        name: string;
-        role: string;
-        approvalStatus: string;
-      }>;
-      const managerUser = storedUsers.find((u) => 
-        u.email === email && u.password === password && u.role === "Manager"
-      );
-
-      if (managerUser) {
-        // Manager found in localStorage
-        if (managerUser.approvalStatus !== "approved") {
-          throw new Error("Your manager account is pending admin approval.");
-        }
-
-        // Store and redirect approved manager
-        const userObj: User = {
-          id: managerUser.id,
-          email: managerUser.email,
-          name: managerUser.name,
-          role: "Manager",
-          approvalStatus: "approved"
-        };
-        
-        localStorage.setItem("pms_user", JSON.stringify(userObj));
-        localStorage.setItem("pms_token", "jwt-token-" + Date.now());
-        setUser(userObj);
-        navigate("/manager");
         return;
       }
 
@@ -101,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (idNum < 1 || idNum > 499) throw new Error("Staff ID must be between 001–499");
       }
 
-      // 🔹 If not a manager, check Staff in database
+      // 🔹 Use backend login route (now handles both staff and managers from database)
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
@@ -116,11 +88,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(data.error || "Login failed");
       }
 
-      // Store and redirect staff user
+      // Store and redirect user
       localStorage.setItem("pms_user", JSON.stringify(data.user));
       localStorage.setItem("pms_token", "jwt-token-" + Date.now());
       setUser(data.user);
-      navigate("/dashboard");
+
+      if (data.user.role === "Admin") {
+        navigate("/admin");
+      } else if (data.user.role === "Manager") {
+        navigate("/manager");
+      } else {
+        navigate("/dashboard");
+      }
 
     } catch (error) {
       console.error("Login error:", error);
@@ -134,22 +113,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (name: string, email: string, password: string, role: "Manager" | "Staff") => {
     setIsLoading(true);
     try {
+      // 🔹 Use backend register route for both staff and managers
+      const response = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, email, password, role }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Registration failed");
+      }
+
       if (role === "Staff") {
-        // 🔹 STAFF: Use backend register route (database)
-        const response = await fetch("http://localhost:5000/api/auth/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ name, email, password, role }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Registration failed");
-        }
-
         // Extract just the ID number from the message for display
         const staffId = data.message.match(/Your Staff ID is: (\d+)/)?.[1];
         if (staffId) {
@@ -157,43 +136,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           toast.success("Staff account created! Please contact admin for login credentials.");
         }
-        navigate("/login");
       } else {
-        // 🔹 MANAGER: Use localStorage for approval system
-        const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
-          id: string;
-          email: string;
-          password: string;
-          name: string;
-          role: string;
-          approvalStatus: string;
-          createdAt?: string;
-        }>;
-        
-        // Check if manager already exists
-        const existingManager = storedUsers.find((u) => u.email === email && u.role === "Manager");
-        if (existingManager) {
-          throw new Error("Manager with this email already exists.");
-        }
-
-        // Create manager object for localStorage
-        const newManager = {
-          id: Date.now().toString(),
-          name,
-          email,
-          password,
-          role: "Manager",
-          approvalStatus: "pending" as const,
-          createdAt: new Date().toISOString()
-        };
-
-        // Save to localStorage
-        storedUsers.push(newManager);
-        localStorage.setItem("pms_users", JSON.stringify(storedUsers));
-
         toast.info("Manager account request submitted! Please wait for admin approval before login.");
-        navigate("/login");
       }
+      
+      navigate("/login");
+
     } catch (err) {
       console.error("Signup error:", err);
       const errorMessage = err instanceof Error ? err.message : "Signup failed.";
@@ -203,28 +151,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // NEW FUNCTION: Get pending managers from localStorage (sync)
-  const getPendingManagers = (): User[] => {
+  // Get pending managers from database
+  const getPendingManagers = async (): Promise<User[]> => {
     try {
-      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
-        id: string;
-        email: string;
-        name: string;
-        role: string;
-        approvalStatus: string;
-      }>;
-      const pendingManagers = storedUsers.filter((u) => 
-        u.role === "Manager" && u.approvalStatus === "pending"
-      );
-      
-      // Convert to User interface format
-      return pendingManagers.map((manager) => ({
-        id: manager.id,
-        name: manager.name,
-        email: manager.email,
-        role: "Manager",
-        approvalStatus: "pending"
-      }));
+      const response = await fetch("http://localhost:5000/api/admin/pending-managers", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch pending managers");
+      }
+
+      return data.pendingManagers || [];
     } catch (error) {
       console.error("Error fetching pending managers:", error);
       toast.error("Failed to load pending managers");
@@ -232,35 +175,159 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // NEW FUNCTION: Approve a manager in localStorage (sync)
-  const approveManager = (managerEmail: string): boolean => {
+  // Approve a manager in database
+  const approveManager = async (managerId: string): Promise<boolean> => {
     try {
-      const storedUsers = JSON.parse(localStorage.getItem("pms_users") || "[]") as Array<{
-        id: string;
-        email: string;
-        password: string;
-        name: string;
-        role: string;
-        approvalStatus: string;
-        createdAt?: string;
-      }>;
-      
-      const updatedUsers = storedUsers.map((u) => {
-        if (u.email === managerEmail && u.role === "Manager") {
-          return { ...u, approvalStatus: "approved" };
-        }
-        return u;
+      const response = await fetch("http://localhost:5000/api/admin/approve-manager", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ managerId }),
       });
 
-      localStorage.setItem("pms_users", JSON.stringify(updatedUsers));
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to approve manager");
+      }
+
       toast.success("Manager approved successfully!");
       return true;
     } catch (error) {
       console.error("Error approving manager:", error);
-      toast.error("Failed to approve manager");
+      toast.error(error.message || "Failed to approve manager");
       return false;
     }
   };
+
+  // NEW: Get all users for admin management
+  const getAllUsers = async (): Promise<User[]> => {
+    try {
+      const response = await fetch("http://localhost:5000/api/admin/users", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch users");
+      }
+
+      return data.users || [];
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast.error("Failed to load users");
+      return [];
+    }
+  };
+
+  // NEW: Create user (for admin)
+  const createUser = async (userData: { name: string; email: string; password: string; role: "Manager" | "Staff" }): Promise<any> => {
+    try {
+      const response = await fetch("http://localhost:5000/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create user");
+      }
+
+      toast.success("User created successfully!");
+      return data;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      toast.error(error.message || "Failed to create user");
+      throw error;
+    }
+  };
+
+  // NEW: Update user status (activate/deactivate)
+  const updateUserStatus = async (userId: string, isActive: boolean): Promise<boolean> => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ is_active: isActive }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update user status");
+      }
+
+      toast.success(`User ${isActive ? "activated" : "deactivated"} successfully!`);
+      return true;
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      toast.error(error.message || "Failed to update user status");
+      return false;
+    }
+  };
+
+  // NEW: Reset user password
+  const resetUserPassword = async (userId: string, newPassword: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to reset password");
+      }
+
+      toast.success("Password reset successfully!");
+      return true;
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error(error.message || "Failed to reset password");
+      return false;
+    }
+  };
+
+  // NEW: Edit user details
+const editUser = async (userId: string, userData: { name: string }): Promise<boolean> => {
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(userData),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to update user");
+    }
+
+    toast.success("User updated successfully!");
+    return true;
+  } catch (error) {
+    console.error("Error updating user:", error);
+    toast.error(error.message || "Failed to update user");
+    return false;
+  }
+};
 
   const logout = () => {
     localStorage.removeItem("pms_user");
@@ -276,8 +343,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       register, 
       logout, 
       isLoading,
-      getPendingManagers, // Add new functions
-      approveManager 
+      getPendingManagers,
+      approveManager,
+      getAllUsers,
+      createUser,
+      updateUserStatus,
+      resetUserPassword,
+      editUser
     }}>
       {children}
     </AuthContext.Provider>
