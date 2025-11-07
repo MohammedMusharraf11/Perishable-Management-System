@@ -24,3 +24,4 @@ frontend/*.sln
 frontend/*.sw?
 
 .env
+.env.example

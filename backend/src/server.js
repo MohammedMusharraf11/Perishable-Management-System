@@ -3,7 +3,11 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimitLogin } from "./middleware/auth.middleware.js";
 
 // Routes
 import inventoryRoutes from "./routes/inventory_routes.js";
@@ -36,9 +40,71 @@ const supabase = createClient(
 // ----------------------------
 // Middleware
 // ----------------------------
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Security headers with helmet.js (PMS-T-107)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  xssFilter: true,
+}));
+
+// CORS configuration with whitelist
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:8080',
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Body parsing with size limits to prevent DoS
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request sanitization - prevent XSS
+app.use((req, res, next) => {
+  // Sanitize request body
+  if (req.body) {
+    Object.keys(req.body).forEach(key => {
+      if (typeof req.body[key] === 'string') {
+        // Remove potential XSS patterns
+        req.body[key] = req.body[key]
+          .replace(/<script[^>]*>.*?<\/script>/gi, '')
+          .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+\s*=/gi, '');
+      }
+    });
+  }
+  next();
+});
 
 // ----------------------------
 // API Routes
@@ -66,10 +132,20 @@ app.get("/health", (req, res) => {
 // Auth & Admin Routes
 // ----------------------------
 
-// Register Route
+// Register Route - PMS-T-105: Secure password hashing
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    
+    // Input validation
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+    
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters long" });
+    }
+    
     let staffEmail = email;
     let staffId = null;
 
@@ -101,13 +177,17 @@ app.post("/api/auth/register", async (req, res) => {
     if (existing)
       return res.status(400).json({ error: "User with this email already exists." });
 
+    // Hash password using bcrypt (PMS-T-105)
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
     const { data, error } = await supabase
       .from("pms_users")
       .insert([
         {
           name,
           email: staffEmail,
-          password, // ⚠ hash in production
+          password: hashedPassword,
           role,
           staff_id: staffId,
           approval_status: role === "Manager" ? "pending" : "approved",
@@ -120,7 +200,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     res.json({
       success: true,
-      user: data,
+      user: { id: data.id, email: data.email, name: data.name, role: data.role },
       message:
         role === "Staff"
           ? `Your Staff ID is: ${String(staffId).padStart(3, "0")}. Use ${staffEmail} to login.`
@@ -132,19 +212,28 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-// Login Route
-app.post("/api/auth/login", async (req, res) => {
+// Login Route - PMS-T-105: Secure authentication with JWT and rate limiting
+app.post("/api/auth/login", rateLimitLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
 
     const { data: user, error } = await supabase
       .from("pms_users")
       .select("*")
       .eq("email", email)
-      .eq("password", password)
       .single();
 
     if (error || !user)
+      return res.status(401).json({ error: "Invalid credentials." });
+
+    // Verify password using bcrypt (PMS-T-105)
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    
+    if (!passwordMatch)
       return res.status(401).json({ error: "Invalid credentials." });
 
     if (user.role === "Manager" && user.approval_status !== "approved")
@@ -152,8 +241,20 @@ app.post("/api/auth/login", async (req, res) => {
         error: "Your manager account is pending admin approval.",
       });
 
+    // Generate JWT token (PMS-T-105)
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
     res.json({
       success: true,
+      token,
       user: {
         id: user.id,
         email: user.email,
