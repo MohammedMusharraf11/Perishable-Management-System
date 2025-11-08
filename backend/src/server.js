@@ -1,13 +1,10 @@
-// server/server.js
+// backend/src/server.js
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { createClient } from "@supabase/supabase-js";
 import { rateLimitLogin } from "./middleware/auth.middleware.js";
 
 // Jobs
@@ -23,6 +20,10 @@ import cronRoutes from "./routes/cron.routes.js";
 import reportRoutes from "./routes/report.routes.js";
 import publicEnvRouter from "./routes/publicENV.js";
 import alertRoutes from "./routes/alert_routes.js";
+import promotionRoutes from "./routes/promotion.routes.js";
+
+// Supabase client
+import "./config/supabaseClient.js";
 
 // ======================================================
 // Load Environment Variables
@@ -38,18 +39,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ======================================================
-// Initialize Supabase Client (for general use)
+// Helmet Security
 // ======================================================
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-// ======================================================
-// Middleware
-// ======================================================
-
-// Security headers with helmet.js (PMS-T-107)
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -60,11 +51,7 @@ app.use(
         imgSrc: ["'self'", "data:", "https:"],
       },
     },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
     frameguard: { action: "deny" },
     noSniff: true,
     xssFilter: true,
@@ -72,7 +59,7 @@ app.use(
 );
 
 // ======================================================
-// ✅ CORS Configuration (Fix for x-user-role header)
+// CORS Configuration
 // ======================================================
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:8080",
@@ -81,15 +68,19 @@ const allowedOrigins = [
   "http://localhost:3000",
 ];
 
+// Smart dev mode: auto-allow localhost during development
+const isDev = process.env.NODE_ENV !== "production";
+
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, curl, Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg =
-          "🚫 The CORS policy for this site does not allow access from the specified Origin.";
-        return callback(new Error(msg), false);
+      if (!origin) return callback(null, true); // Allow non-browser tools
+      if (isDev && origin.startsWith("http://localhost")) {
+        return callback(null, true);
+      }
+      if (!allowedOrigins.includes(origin)) {
+        console.warn("🚫 Blocked CORS from:", origin);
+        return callback(new Error("CORS origin not allowed"), false);
       }
       return callback(null, true);
     },
@@ -98,23 +89,27 @@ app.use(
     allowedHeaders: [
       "Content-Type",
       "Authorization",
-      "x-user-role", // 👈 Needed for Manager Dashboard
+      "x-user-role",
+      "x-user-id",
+      "x-user-name",
     ],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
   })
 );
 
-// ✅ Handle preflight OPTIONS requests
+// ✅ Handle all preflight OPTIONS requests
 app.options("*", cors());
 
 // ======================================================
-// Body Parsing & Sanitization
+// Express Middleware
 // ======================================================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Sanitize request body (prevent XSS)
+// Sanitize incoming body content to prevent XSS injection
 app.use((req, res, next) => {
-  if (req.body) {
+  if (req.body && typeof req.body === "object") {
     Object.keys(req.body).forEach((key) => {
       if (typeof req.body[key] === "string") {
         req.body[key] = req.body[key]
@@ -128,15 +123,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Optional: Log incoming headers for debugging (uncomment if needed)
+// app.use((req, res, next) => {
+//   console.log("🧾 Incoming Headers:", req.headers);
+//   next();
+// });
+
 // ======================================================
 // Routes
 // ======================================================
-
-// Auth & Admin
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-
-// Functional routes
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/audit-logs", auditRoutes);
@@ -144,9 +141,10 @@ app.use("/api/cron", cronRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/publicENV", publicEnvRouter);
 app.use("/api/alerts", alertRoutes);
+app.use("/api/promotions", promotionRoutes);
 
 // ======================================================
-// Health Check Route
+// Health Check
 // ======================================================
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -160,10 +158,10 @@ app.get("/health", (req, res) => {
 // Global Error Handler
 // ======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 Global Error:", err.message);
+  console.error("🔥 Global Error:", err.stack || err.message || err);
   res.status(500).json({
     error: "Internal Server Error",
-    details: err.message,
+    details: err.message || String(err),
   });
 });
 
@@ -180,8 +178,6 @@ app.listen(PORT, () => {
   console.log("=".repeat(60));
   console.log("✨ Server ready for requests!");
   console.log("-".repeat(60));
-
-  // Start scheduled jobs
   console.log("⏰ Initializing Scheduled Jobs...");
   startExpiryMonitorJob();
   console.log("=".repeat(60));
