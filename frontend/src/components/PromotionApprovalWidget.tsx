@@ -299,7 +299,7 @@
 //   );
 // };
 
-// export default PromotionApprovalWidget;
+// export default PromotionApprovalWidget; old code above
 
 
 import React, { useEffect, useState } from "react";

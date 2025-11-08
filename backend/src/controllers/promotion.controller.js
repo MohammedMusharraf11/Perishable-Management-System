@@ -245,8 +245,7 @@
 //     console.error("❌ Error rejecting discount:", err);
 //     return res.status(500).json({ success: false, message: err.message });
 //   }
-// };
-
+// };old code above
 
 // backend/src/controllers/promotion.controller.js
 import { supabase } from "../config/supabaseClient.js";
