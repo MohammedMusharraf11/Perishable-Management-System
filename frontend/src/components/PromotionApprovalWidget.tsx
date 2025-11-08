@@ -300,3 +300,4 @@ const PromotionApprovalWidget: React.FC = () => {
 };
 
 export default PromotionApprovalWidget;
+
