@@ -12,6 +12,8 @@ import {
   DollarSign,
   BarChart3,
   LineChart as LineChartIcon,
+  Clock,
+  Package,
 } from "lucide-react";
 import {
   LineChart,
@@ -28,7 +30,9 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import PromotionApprovalWidget from "@/components/PromotionApprovalWidget"; // ✅ Added Import
 
+/* ------------------------- TYPES ------------------------- */
 interface KPIData {
   totalWasteValue: number;
   itemsExpiringToday: number;
@@ -53,6 +57,111 @@ interface DashboardData {
   };
 }
 
+/* -------------------- ALERT WIDGET -------------------- */
+const AlertWidget: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!user || user.role !== "Manager") return;
+
+    const fetchAlerts = async () => {
+      try {
+        setError(false);
+        const res = await fetch("http://localhost:5000/api/alerts", {
+          headers: { "x-user-role": user.role },
+        });
+        if (!res.ok) throw new Error("Failed to fetch alerts");
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        console.error("Error fetching alerts:", err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  if (!user || user.role !== "Manager") return null;
+
+  const { expired, high, medium, low, total } = data?.counts || {};
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="w-full md:w-[400px] lg:w-[420px]"
+    >
+      <Card
+        className="glass p-4 border-2 border-primary/10 hover:border-primary/30 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-white via-gray-50 to-gray-100"
+        onClick={() => navigate("/inventory?filter=expiring")}
+      >
+        <CardHeader className="flex items-center justify-between pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-800">
+            <AlertTriangle className="text-red-600 h-5 w-5" />
+            Expiry Alerts
+          </CardTitle>
+          <span className="bg-red-600 text-white px-3 py-0.5 rounded-full text-sm font-bold shadow-sm">
+            {total || 0}
+          </span>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {/* Alert badges */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium shadow">
+              🔴 Expired: {expired || 0}
+            </span>
+            <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow animate-pulse">
+              🟠 Today: {high || 0}
+            </span>
+            <span className="bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-medium shadow">
+              🟡 48h: {(medium || 0) + (low || 0)}
+            </span>
+          </div>
+
+          {/* Critical items list */}
+          <div className="bg-white rounded-lg p-3 shadow-inner max-h-[180px] overflow-y-auto">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Top Critical Items
+            </h3>
+            {data?.topCritical?.length === 0 ? (
+              <p className="text-xs text-gray-500 italic">No critical items 🎉</p>
+            ) : (
+              <ul className="divide-y divide-gray-200 text-sm">
+                {data?.topCritical?.slice(0, 5).map((item: any, i: number) => (
+                  <li key={i} className="flex justify-between py-1.5 items-center">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium text-gray-800 text-sm">
+                        {item.product_name || item.name}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(item.expiry_date).toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
+
+/* -------------------- MANAGER DASHBOARD -------------------- */
 const ManagerDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -73,9 +182,7 @@ const ManagerDashboard = () => {
         `http://localhost:5000/api/reports/dashboard?startDate=${startDate}&endDate=${endDate}`
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch dashboard data");
-      }
+      if (!response.ok) throw new Error("Failed to fetch dashboard data");
 
       const data: DashboardData = await response.json();
       setDashboardData(data);
@@ -89,12 +196,7 @@ const ManagerDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-
-    // Auto-refresh every 5 minutes
-    const interval = setInterval(() => {
-      fetchDashboardData();
-    }, 5 * 60 * 1000);
-
+    const interval = setInterval(fetchDashboardData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -103,11 +205,14 @@ const ManagerDashboard = () => {
     fetchDashboardData(startDate, endDate);
   };
 
-  const handleKPIClick = (route: string) => {
-    navigate(route);
+  const handleKPIClick = (route: string) => navigate(route);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
-  if (isLoading && !dashboardData) {
+  if (isLoading && !dashboardData)
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
@@ -118,17 +223,6 @@ const ManagerDashboard = () => {
         </div>
       </Layout>
     );
-  }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
 
   return (
     <Layout>
@@ -146,7 +240,13 @@ const ManagerDashboard = () => {
           <DateRangeSelector onDateRangeChange={handleDateRangeChange} />
         </div>
 
-        {/* KPI Cards Grid */}
+        {/* 🧩 Compact Top Section (Alerts + Promotions Section) */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+          <AlertWidget />
+          <PromotionApprovalWidget /> {/* ✅ Integrated Here */}
+        </div>
+
+        {/* KPI Cards */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -195,9 +295,9 @@ const ManagerDashboard = () => {
           />
         </motion.div>
 
-        {/* Charts */}
+        {/* Charts Section */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Daily Waste Trend - Line Chart */}
+          {/* Line Chart */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -216,17 +316,16 @@ const ManagerDashboard = () => {
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={dashboardData?.trends.dailyWaste || []}>
-                    <defs>
-                      <linearGradient id="wasteGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis
                       dataKey="date"
                       stroke="hsl(var(--muted-foreground))"
-                      tickFormatter={(value) => new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      tickFormatter={(value) =>
+                        new Date(value).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      }
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
@@ -235,7 +334,6 @@ const ManagerDashboard = () => {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "12px",
                       }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
                       formatter={(value: number) => [`₹${value.toFixed(2)}`, "Waste Value"]}
                     />
                     <Line
@@ -243,7 +341,6 @@ const ManagerDashboard = () => {
                       dataKey="value"
                       stroke="hsl(var(--destructive))"
                       strokeWidth={3}
-                      fill="url(#wasteGradient)"
                       dot={{ fill: "hsl(var(--destructive))", r: 4 }}
                     />
                   </LineChart>
@@ -252,7 +349,7 @@ const ManagerDashboard = () => {
             </Card>
           </motion.div>
 
-          {/* Items Wasted Per Day - Bar Chart */}
+          {/* Bar Chart */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -275,7 +372,12 @@ const ManagerDashboard = () => {
                     <XAxis
                       dataKey="date"
                       stroke="hsl(var(--muted-foreground))"
-                      tickFormatter={(value) => new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      tickFormatter={(value) =>
+                        new Date(value).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      }
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
@@ -284,16 +386,9 @@ const ManagerDashboard = () => {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "12px",
                       }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                      formatter={(value: number) => [value, "Items Wasted"]}
                     />
                     <Legend />
-                    <Bar
-                      dataKey="count"
-                      fill="hsl(var(--primary))"
-                      radius={[8, 8, 0, 0]}
-                      name="Items Wasted"
-                    />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -301,7 +396,6 @@ const ManagerDashboard = () => {
           </motion.div>
         </div>
 
-        {/* Auto-refresh indicator */}
         <div className="text-center text-xs text-muted-foreground">
           Dashboard auto-refreshes every 5 minutes
         </div>

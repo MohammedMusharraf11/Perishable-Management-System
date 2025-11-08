@@ -1,10 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { AlertTriangle, Clock, Package, ArrowRight } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface AlertData {
-  counts: { expired: number; high: number; medium: number; low: number; total: number };
-  topCritical: any[];
+  counts: {
+    expired: number;
+    high: number;
+    medium: number;
+    low: number;
+    total: number;
+  };
+  topCritical: {
+    product_name?: string;
+    name?: string;
+    expiry_date: string;
+    category?: string;
+    quantity?: number;
+  }[];
   timestamp: string;
 }
 
@@ -29,7 +44,7 @@ const AlertWidget: React.FC = () => {
     };
 
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 60000); // refresh every minute
+    const interval = setInterval(fetchAlerts, 60000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -38,35 +53,124 @@ const AlertWidget: React.FC = () => {
   const { expired, high, medium, low, total } = data.counts;
 
   return (
-    <div
-      className="p-4 bg-white shadow-md rounded-2xl w-full max-w-md cursor-pointer hover:shadow-lg transition"
+    <motion.div
+      className="w-full cursor-pointer"
       onClick={() => navigate("/inventory?filter=expiring")}
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
     >
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-semibold">Expiry Alerts</h2>
-        <span className="bg-red-600 text-white px-2 py-1 rounded-full text-sm font-bold">
-          {total}
-        </span>
-      </div>
+      <Card className="border border-border/50 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01] bg-white/90 backdrop-blur-md">
+        {/* 🔹 Header: REMOVED sm:justify-between TO LEFT ALIGN ALL CONTENT */}
+        <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <CardTitle className="text-lg font-semibold text-gray-800">
+              Expiry Alerts
+            </CardTitle>
+          </div>
+          <motion.span
+            className="px-3 py-1 bg-destructive text-white rounded-full text-sm font-semibold shadow-sm mt-2 sm:mt-0 sm:ml-4" // Added sm:ml-4 for a small space
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200 }}
+          >
+            {total}
+          </motion.span>
+        </CardHeader>
 
-      <div className="flex gap-2 mb-3 flex-wrap">
-        <span className="bg-black text-white px-3 py-1 rounded-full text-sm">⚫ Expired: {expired}</span>
-        <span className="bg-red-600 text-white px-3 py-1 rounded-full text-sm animate-pulse">⚠️ High: {high}</span>
-        <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm">⚠ Medium: {medium}</span>
-        <span className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm">⏳ Low: {low}</span>
-      </div>
-
-      <ul className="text-sm space-y-1">
-        {data.topCritical.map((item, i) => (
-          <li key={i} className="flex justify-between border-b pb-1">
-            <span>{item.product_name || item.name}</span>
-            <span className="text-xs text-gray-500">
-              {new Date(item.expiry_date).toLocaleDateString()}
+        {/* 🔸 Alert Summary Badges */}
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <span className="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+              🔴 Expired: {expired}
             </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+            <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+              🟠 Today: {high}
+            </span>
+            <span className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-medium">
+              🟡 48h: {medium + low}
+            </span>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border/60 my-2"></div>
+
+          {/* 🧾 Top Critical Items */}
+          <div className="bg-gray-50 rounded-lg p-3 shadow-inner">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Top Critical Items
+            </h3>
+
+            {data.topCritical.length === 0 ? (
+              <p className="text-sm text-gray-500 italic text-center py-2">
+                No critical items 🎉
+              </p>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {data.topCritical.map((item, i) => {
+                  const name = item.product_name || item.name || "Unnamed Item";
+                  const date = new Date(item.expiry_date);
+                  const diffHrs =
+                    (date.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+
+                  let label = "";
+                  if (diffHrs < 0) label = "Expired";
+                  else if (diffHrs <= 24) label = "Today";
+                  else if (diffHrs <= 48) label = "Soon";
+                  else label = "Upcoming";
+
+                  const color =
+                    label === "Expired"
+                      ? "text-red-600"
+                      : label === "Today"
+                      ? "text-orange-500"
+                      : label === "Soon"
+                      ? "text-yellow-500"
+                      : "text-gray-400";
+
+                  return (
+                    <motion.li
+                      key={i}
+                      className="flex justify-between items-center py-1.5"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-gray-500" />
+                        <span className="font-medium text-gray-800">
+                          {name}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span
+                          className={`text-xs font-semibold leading-tight ${color}`}
+                        >
+                          {label}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {date.toLocaleDateString()}
+                        </span>
+                      </div>
+                    </motion.li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end mt-3">
+            <span className="flex items-center text-xs text-primary font-medium hover:underline">
+              View all expiring items
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 };
 
