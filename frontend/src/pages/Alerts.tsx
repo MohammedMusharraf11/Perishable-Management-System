@@ -1,9 +1,11 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Loader2, DollarSign, Printer, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { generatePriceLabels } from "@/utils/labelGenerator";
 
 interface Alert {
   id: string;
@@ -11,54 +13,114 @@ interface Alert {
   name: string;
   category: string;
   quantity: number;
+  unit: string;
+  basePrice: number;
+  currentDiscount: number;
   expiryDate: string;
   daysLeft: number;
   urgency: "critical" | "high" | "medium";
 }
 
 const Alerts = () => {
-  const alerts: Alert[] = [
-    {
-      id: "1",
-      sku: "BREAD-005",
-      name: "Whole Wheat Bread",
-      category: "Bakery",
-      quantity: 8,
-      expiryDate: "2025-10-24",
-      daysLeft: -1,
-      urgency: "critical",
-    },
-    {
-      id: "2",
-      sku: "MEAT-012",
-      name: "Chicken Breast",
-      category: "Meat",
-      quantity: 12,
-      expiryDate: "2025-10-27",
-      daysLeft: 2,
-      urgency: "critical",
-    },
-    {
-      id: "3",
-      sku: "FRUIT-023",
-      name: "Strawberries 250g",
-      category: "Produce",
-      quantity: 30,
-      expiryDate: "2025-10-28",
-      daysLeft: 3,
-      urgency: "high",
-    },
-    {
-      id: "4",
-      sku: "DAIRY-015",
-      name: "Cheddar Cheese",
-      category: "Dairy",
-      quantity: 15,
-      expiryDate: "2025-10-30",
-      daysLeft: 5,
-      urgency: "medium",
-    },
-  ];
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  const fetchAlerts = async () => {
+    setLoading(true);
+    try {
+      // Fetch expiring items from backend
+      const response = await fetch("http://localhost:5000/api/alerts");
+      const data = await response.json();
+
+      if (data.success) {
+        // Transform the data
+        const transformedAlerts: Alert[] = [];
+        
+        if (data.expired) {
+          data.expired.forEach((item: any) => {
+            transformedAlerts.push({
+              id: item.batch_id,
+              sku: item.sku,
+              name: item.product_name || item.name,
+              category: item.category || 'N/A',
+              quantity: item.quantity,
+              unit: item.unit || 'units',
+              basePrice: item.base_price || 0,
+              currentDiscount: item.current_discount || 0,
+              expiryDate: item.expiry_date,
+              daysLeft: -1,
+              urgency: "critical" as const,
+            });
+          });
+        }
+
+        if (data.expiringToday) {
+          data.expiringToday.forEach((item: any) => {
+            transformedAlerts.push({
+              id: item.batch_id,
+              sku: item.sku,
+              name: item.product_name || item.name,
+              category: item.category || 'N/A',
+              quantity: item.quantity,
+              unit: item.unit || 'units',
+              basePrice: item.base_price || 0,
+              currentDiscount: item.current_discount || 0,
+              expiryDate: item.expiry_date,
+              daysLeft: 0,
+              urgency: "critical" as const,
+            });
+          });
+        }
+
+        if (data.expiring1Day) {
+          data.expiring1Day.forEach((item: any) => {
+            transformedAlerts.push({
+              id: item.batch_id,
+              sku: item.sku,
+              name: item.product_name || item.name,
+              category: item.category || 'N/A',
+              quantity: item.quantity,
+              unit: item.unit || 'units',
+              basePrice: item.base_price || 0,
+              currentDiscount: item.current_discount || 0,
+              expiryDate: item.expiry_date,
+              daysLeft: 1,
+              urgency: "high" as const,
+            });
+          });
+        }
+
+        if (data.expiring2Days) {
+          data.expiring2Days.forEach((item: any) => {
+            transformedAlerts.push({
+              id: item.batch_id,
+              sku: item.sku,
+              name: item.product_name || item.name,
+              category: item.category || 'N/A',
+              quantity: item.quantity,
+              unit: item.unit || 'units',
+              basePrice: item.base_price || 0,
+              currentDiscount: item.current_discount || 0,
+              expiryDate: item.expiry_date,
+              daysLeft: 2,
+              urgency: "medium" as const,
+            });
+          });
+        }
+
+        setAlerts(transformedAlerts);
+      }
+    } catch (error) {
+      console.error("Error fetching alerts:", error);
+      toast.error("Failed to load alerts");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
@@ -92,15 +154,92 @@ const Alerts = () => {
     toast.success("Discount applied to item");
   };
 
+  const handlePrintLabel = (alert: Alert) => {
+    try {
+      generatePriceLabels([{
+        sku: alert.sku,
+        name: alert.name,
+        category: alert.category,
+        basePrice: alert.basePrice,
+        currentDiscount: alert.currentDiscount,
+        expiryDate: alert.expiryDate
+      }], true);
+      
+      toast.success(`Label generated for ${alert.name}`);
+    } catch (error) {
+      console.error('Label generation error:', error);
+      toast.error("Failed to generate label");
+    }
+  };
+
+  const handlePrintAllLabels = () => {
+    const discountedAlerts = alerts.filter(alert => alert.currentDiscount > 0 && alert.daysLeft >= 0);
+    
+    if (discountedAlerts.length === 0) {
+      toast.error("No discounted items to print");
+      return;
+    }
+
+    try {
+      const labelData = discountedAlerts.map(alert => ({
+        sku: alert.sku,
+        name: alert.name,
+        category: alert.category,
+        basePrice: alert.basePrice,
+        currentDiscount: alert.currentDiscount,
+        expiryDate: alert.expiryDate
+      }));
+
+      generatePriceLabels(labelData, true);
+      toast.success(`Generated ${discountedAlerts.length} labels`);
+    } catch (error) {
+      console.error('Batch label generation error:', error);
+      toast.error("Failed to generate labels");
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Alerts</h1>
-          <p className="text-muted-foreground">Items requiring immediate attention</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Alerts</h1>
+            <p className="text-muted-foreground">Items requiring immediate attention</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handlePrintAllLabels}
+              disabled={loading || alerts.filter(a => a.currentDiscount > 0 && a.daysLeft >= 0).length === 0}
+              variant="default"
+              size="sm"
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Print All Labels ({alerts.filter(a => a.currentDiscount > 0 && a.daysLeft >= 0).length})
+            </Button>
+            <Button
+              onClick={fetchAlerts}
+              disabled={loading}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Clock className="h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-4">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid gap-4">
           {alerts.map((alert) => (
             <Card key={alert.id} className="border-l-4" style={{ borderLeftColor: getUrgencyColor(alert.urgency).replace('bg-', 'hsl(var(--') + '))' }}>
               <CardHeader>
@@ -124,31 +263,51 @@ const Alerts = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Quantity</p>
-                    <p className="text-lg font-semibold">{alert.quantity}</p>
+                    <p className="text-lg font-semibold">
+                      {alert.quantity} {alert.unit}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Base Price</p>
+                    <p className="text-lg font-semibold flex items-center gap-1">
+                      <DollarSign className="h-4 w-4" />
+                      ₹{alert.basePrice.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Current Discount</p>
+                    <p className="text-lg font-semibold">
+                      {alert.currentDiscount > 0 ? (
+                        <span className="text-success">{alert.currentDiscount}% OFF</span>
+                      ) : (
+                        <span className="text-muted-foreground">None</span>
+                      )}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Expiry Date</p>
                     <p className="text-lg font-semibold">
-                      {new Date(alert.expiryDate).toLocaleDateString()}
+                      {new Date(alert.expiryDate).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Days Left</p>
                     <p className={`text-lg font-semibold ${
                       alert.daysLeft < 0 ? 'text-destructive' : 
+                      alert.daysLeft === 0 ? 'text-destructive' :
                       alert.daysLeft <= 2 ? 'text-warning' : 
                       'text-foreground'
                     }`}>
-                      {alert.daysLeft < 0 ? 'Expired' : `${alert.daysLeft} days`}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <p className="text-lg font-semibold">
-                      {alert.daysLeft < 0 ? 'Remove' : 'Discount'}
+                      {alert.daysLeft < 0 ? 'Expired' : 
+                       alert.daysLeft === 0 ? 'Today' :
+                       `${alert.daysLeft} days`}
                     </p>
                   </div>
                 </div>
@@ -162,6 +321,14 @@ const Alerts = () => {
                         onClick={() => handleApplyDiscount(alert.id)}
                       >
                         Apply Discount
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePrintLabel(alert)}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Print Label
                       </Button>
                       <Button
                         size="sm"
@@ -195,9 +362,10 @@ const Alerts = () => {
             </Card>
           ))}
         </div>
+        )}
 
-        {alerts.length === 0 && (
-          <Card>
+        {!loading && alerts.length === 0 && (
+          <Card className="glass">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <CheckCircle2 className="h-12 w-12 text-success mb-4" />
               <p className="text-xl font-semibold mb-2">No Active Alerts</p>
