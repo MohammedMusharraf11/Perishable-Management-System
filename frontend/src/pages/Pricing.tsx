@@ -50,11 +50,21 @@ const Pricing = () => {
   const [customDiscount, setCustomDiscount] = useState(0);
   const [rejectionReason, setRejectionReason] = useState("");
   const [processing, setProcessing] = useState(false);
+  
+  // Get user role from localStorage
+  const currentUser = JSON.parse(localStorage.getItem("pms_user") || "{}");
+  const userRole = currentUser.role || "staff";
+  const isManager = userRole === "manager";
 
   const fetchSuggestions = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/discount-suggestions/pending");
+      // Managers see pending suggestions, staff see approved ones
+      const endpoint = isManager 
+        ? "http://localhost:5000/api/discount-suggestions/pending"
+        : "http://localhost:5000/api/discount-suggestions/approved";
+      
+      const response = await fetch(endpoint);
       const data = await response.json();
       
       if (data.success) {
@@ -302,25 +312,31 @@ const Pricing = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold text-primary dark:text-primary">
               Dynamic Pricing
             </h1>
-            <p className="text-muted-foreground">Review and approve AI-suggested discounts</p>
+            <p className="text-muted-foreground">
+              {isManager 
+                ? "Review and approve AI-suggested discounts" 
+                : "View approved discount suggestions"}
+            </p>
           </div>
           <div className="flex gap-3">
-            <Button
-              onClick={triggerAnalysis}
-              disabled={loading}
-              variant="outline"
-              className="gap-2"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Run Analysis
-            </Button>
+            {isManager && (
+              <Button
+                onClick={triggerAnalysis}
+                disabled={loading}
+                variant="outline"
+                className="gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Run Analysis
+              </Button>
+            )}
             <div className="glass px-6 py-3 rounded-2xl">
               <div className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-success" />
@@ -343,14 +359,20 @@ const Pricing = () => {
           <Card className="glass">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Pending Suggestions</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                {isManager ? "No Pending Suggestions" : "No Approved Discounts"}
+              </h3>
               <p className="text-muted-foreground text-center mb-4">
-                There are no discount suggestions at this time. Run the analysis to generate new suggestions.
+                {isManager 
+                  ? "There are no discount suggestions at this time. Run the analysis to generate new suggestions."
+                  : "There are no approved discounts at this time. Check back later."}
               </p>
-              <Button onClick={triggerAnalysis} className="gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Run Analysis Now
-              </Button>
+              {isManager && (
+                <Button onClick={triggerAnalysis} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Run Analysis Now
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -438,24 +460,32 @@ const Pricing = () => {
                         </div>
 
                         <div className="flex gap-2">
-                          <Button
-                            size="lg"
-                            className="gradient-primary shadow-glow"
-                            onClick={() => handleApproveClick(suggestion)}
-                            disabled={processing}
-                          >
-                            <Check className="mr-2 h-4 w-4" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => handleRejectClick(suggestion)}
-                            disabled={processing}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Reject
-                          </Button>
+                          {isManager ? (
+                            <>
+                              <Button
+                                size="lg"
+                                className="gradient-primary shadow-glow"
+                                onClick={() => handleApproveClick(suggestion)}
+                                disabled={processing}
+                              >
+                                <Check className="mr-2 h-4 w-4" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => handleRejectClick(suggestion)}
+                                disabled={processing}
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Reject
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge variant="outline" className="text-sm py-2 px-4">
+                              {suggestion.status === "approved" ? "✓ Approved" : "⏳ Pending Manager Approval"}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </CardContent>

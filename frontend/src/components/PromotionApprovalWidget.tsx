@@ -422,8 +422,8 @@ const PromotionApprovalWidget: React.FC = () => {
     }
 
     const pdf = new jsPDF();
-    let x = 10,
-      y = 20;
+    const x = 10;
+    let y = 20;
 
     approvedItems.forEach((item, index) => {
       pdf.setFontSize(12);

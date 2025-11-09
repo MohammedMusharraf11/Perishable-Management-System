@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import React, { useEffect, useState } from "react";
+import { CustomChartTooltip } from "@/components/CustomChartTooltip";
 
 // 🧩 Expiry Alert Widget (inline, clean, Manager-only)
 const AlertWidget: React.FC = () => {
@@ -237,13 +238,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "12px",
-                      }}
-                    />
+                    <Tooltip content={<CustomChartTooltip />} />
                     <Area
                       type="monotone"
                       dataKey="items"
@@ -291,13 +286,7 @@ const Dashboard = () => {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "12px",
-                      }}
-                    />
+                    <Tooltip content={<CustomChartTooltip />} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>

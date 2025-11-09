@@ -198,7 +198,7 @@ const WasteReport = () => {
         {/* Header */}
         <div className="flex items-center justify-between print:flex-col print:items-start">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold text-primary dark:text-primary">
               Waste Report Generation
             </h1>
             <p className="text-muted-foreground">Analyze waste patterns and costs</p>
