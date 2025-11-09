@@ -69,6 +69,7 @@ const allowedOrigins = [
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://perishable-management-system.onrender.com",
 ];
 
 // Smart dev mode: auto-allow localhost during development
