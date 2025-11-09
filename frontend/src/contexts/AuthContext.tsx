@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // 🔹 Use backend login route (now handles both staff and managers from database)
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       // 🔹 Use backend register route for both staff and managers
-      const response = await fetch("http://localhost:5000/api/auth/register", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -154,7 +154,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Get pending managers from database
   const getPendingManagers = async (): Promise<User[]> => {
     try {
-      const response = await fetch("http://localhost:5000/api/admin/pending-managers", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/admin/pending-managers`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -178,7 +179,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Approve a manager in database
   const approveManager = async (managerId: string): Promise<boolean> => {
     try {
-      const response = await fetch("http://localhost:5000/api/admin/approve-manager", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/admin/approve-manager`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -203,8 +205,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // NEW: Get all users for admin management
   const getAllUsers = async (): Promise<User[]> => {
-    try {
-      const response = await fetch("http://localhost:5000/api/admin/users", {
+    try:
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/admin/users`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -228,7 +231,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // NEW: Create user (for admin)
   const createUser = async (userData: { name: string; email: string; password: string; role: "Manager" | "Staff" }): Promise<any> => {
     try {
-      const response = await fetch("http://localhost:5000/api/admin/users", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/admin/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -254,7 +258,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // NEW: Update user status (activate/deactivate)
   const updateUserStatus = async (userId: string, isActive: boolean): Promise<boolean> => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/status`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/admin/users/${userId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -280,7 +285,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // NEW: Reset user password
   const resetUserPassword = async (userId: string, newPassword: string): Promise<boolean> => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/reset-password`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/admin/users/${userId}/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -306,7 +312,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // NEW: Edit user details
 const editUser = async (userId: string, userData: { name: string }): Promise<boolean> => {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

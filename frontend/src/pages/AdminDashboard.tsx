@@ -38,18 +38,18 @@ interface AuditLog {
 const AdminDashboard = () => {
   const { user, logout, getPendingManagers, approveManager, getAllUsers, createUser, updateUserStatus, resetUserPassword, editUser } = useAuth();
   const navigate = useNavigate();
-  
+
   const [activeTab, setActiveTab] = useState("pending-approvals");
   const [pendingManagers, setPendingManagers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Dialog states
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
-  
+
   // Form states
   const [newUser, setNewUser] = useState({
     name: "",
@@ -57,7 +57,7 @@ const AdminDashboard = () => {
     password: "",
     role: "Staff" as "Staff" | "Manager"
   });
-  
+
   const [editUserData, setEditUserData] = useState<User | null>(null);
   const [editUserName, setEditUserName] = useState("");
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
@@ -89,7 +89,7 @@ const AdminDashboard = () => {
   // Get audit logs
   const getAuditLogs = async (): Promise<AuditLog[]> => {
     try {
-      const response = await fetch("http://localhost:5000/api/admin/audit-logs/user-management", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/audit-logs/user-management`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -210,11 +210,11 @@ const AdminDashboard = () => {
     if (!user.is_active) {
       return <Badge variant="destructive">Inactive</Badge>;
     }
-    
+
     if (user.role === "Manager" && user.approvalStatus === "pending") {
       return <Badge variant="secondary">Pending Approval</Badge>;
     }
-    
+
     return <Badge variant="default">Active</Badge>;
   };
 
@@ -224,7 +224,7 @@ const AdminDashboard = () => {
       Manager: "bg-blue-100 text-blue-800",
       Staff: "bg-green-100 text-green-800"
     };
-    
+
     return (
       <Badge variant="secondary" className={variants[role as keyof typeof variants]}>
         {role}
@@ -241,7 +241,7 @@ const AdminDashboard = () => {
       PASSWORD_RESET: "bg-orange-100 text-orange-800",
       USER_UPDATED: "bg-yellow-100 text-yellow-800"
     };
-    
+
     const actionLabels: { [key: string]: string } = {
       USER_CREATED: "User Created",
       MANAGER_APPROVED: "Manager Approved",
@@ -250,7 +250,7 @@ const AdminDashboard = () => {
       PASSWORD_RESET: "Password Reset",
       USER_UPDATED: "User Updated"
     };
-    
+
     return (
       <Badge variant="secondary" className={variants[action] || "bg-gray-100 text-gray-800"}>
         {actionLabels[action] || action}
@@ -260,7 +260,7 @@ const AdminDashboard = () => {
 
   const formatAuditData = (data: any) => {
     if (!data) return "N/A";
-    
+
     try {
       if (typeof data === 'object') {
         return Object.entries(data)
@@ -387,7 +387,7 @@ const AdminDashboard = () => {
                             Created: {new Date(user.created_at || "").toLocaleDateString()}
                           </p>
                         </div>
-                        
+
                         <div className="flex items-center gap-4">
                           {/* Activation Toggle */}
                           <div className="flex items-center gap-2">
@@ -458,7 +458,7 @@ const AdminDashboard = () => {
                             {new Date(log.created_at).toLocaleString()}
                           </span>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="font-medium">IP Address:</span> {log.ip_address || "N/A"}
@@ -620,7 +620,7 @@ const AdminDashboard = () => {
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground">
-                {editUserData?.role === "Staff" 
+                {editUserData?.role === "Staff"
                   ? "Staff email cannot be changed (auto-generated)"
                   : "Email changes not supported for managers"
                 }

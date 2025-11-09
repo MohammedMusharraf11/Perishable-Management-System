@@ -32,7 +32,7 @@ const AlertWidget: React.FC = () => {
 
     const fetchAlerts = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/alerts", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/alerts`, {
           headers: { "x-user-role": user.role },
         });
         const json = await res.json();

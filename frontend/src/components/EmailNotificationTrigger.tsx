@@ -14,7 +14,8 @@ export const EmailNotificationTrigger = () => {
     setLastResult(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/cron/email-notification/run");
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/cron/email-notification/run`);
       const data = await response.json();
 
       if (data.success && data.result?.success) {

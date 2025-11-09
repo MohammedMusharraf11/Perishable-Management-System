@@ -47,7 +47,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 
 // API Base URL
-const API_URL = "http://localhost:5000/api/inventory";
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/inventory`;
 
 // Updated interface to match v_active_inventory view
 interface InventoryItem {

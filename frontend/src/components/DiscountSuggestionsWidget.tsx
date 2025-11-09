@@ -39,11 +39,12 @@ export const DiscountSuggestionsWidget = () => {
     setLoading(true);
     try {
       // Fetch pending suggestions
-      const suggestionsRes = await fetch("http://localhost:5000/api/discount-suggestions/pending");
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const suggestionsRes = await fetch(`${API_BASE}/api/discount-suggestions/pending`);
       const suggestionsData = await suggestionsRes.json();
       
       // Fetch stats
-      const statsRes = await fetch("http://localhost:5000/api/discount-suggestions/stats");
+      const statsRes = await fetch(`${API_BASE}/api/discount-suggestions/stats`);
       const statsData = await statsRes.json();
 
       if (suggestionsData.success) {

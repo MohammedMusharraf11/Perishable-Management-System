@@ -60,9 +60,10 @@ const Pricing = () => {
     setLoading(true);
     try {
       // Managers see pending suggestions, staff see approved ones
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const endpoint = isManager 
-        ? "http://localhost:5000/api/discount-suggestions/pending"
-        : "http://localhost:5000/api/discount-suggestions/approved";
+        ? `${API_BASE}/api/discount-suggestions/pending`
+        : `${API_BASE}/api/discount-suggestions/approved`;
       
       const response = await fetch(endpoint);
       const data = await response.json();
@@ -90,7 +91,8 @@ const Pricing = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/discount-suggestions/stats");
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/discount-suggestions/stats`);
       const data = await response.json();
       
       if (data.success) {
@@ -132,8 +134,9 @@ const Pricing = () => {
     
     setProcessing(true);
     try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(
-        `http://localhost:5000/api/discount-suggestions/${selectedSuggestion.id}/approve`,
+        `${API_BASE}/api/discount-suggestions/${selectedSuggestion.id}/approve`,
         {
           method: "PUT",
           headers: {
@@ -216,8 +219,9 @@ const Pricing = () => {
 
     setProcessing(true);
     try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(
-        `http://localhost:5000/api/discount-suggestions/${selectedSuggestion.id}/reject`,
+        `${API_BASE}/api/discount-suggestions/${selectedSuggestion.id}/reject`,
         {
           method: "PUT",
           headers: {
@@ -261,7 +265,8 @@ const Pricing = () => {
   const triggerAnalysis = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/discount-suggestions/analyze", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE}/api/discount-suggestions/analyze`, {
         method: "POST",
       });
       const data = await response.json();

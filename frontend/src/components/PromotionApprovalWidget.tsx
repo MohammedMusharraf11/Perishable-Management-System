@@ -343,7 +343,8 @@ const PromotionApprovalWidget: React.FC = () => {
   const fetchSuggestions = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/promotions/suggestions");
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${API_BASE}/api/promotions/suggestions`);
       if (!res.ok) throw new Error("Failed to fetch promotions");
       const json = await res.json();
       setSuggestions(json.suggestions || []);
@@ -362,7 +363,8 @@ const PromotionApprovalWidget: React.FC = () => {
   const approveDiscount = async (batchId: string, approved_discount: number) => {
     setApproving(batchId);
     try {
-      const res = await fetch(`http://localhost:5000/api/promotions/${batchId}/approve`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${API_BASE}/api/promotions/${batchId}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -386,7 +388,8 @@ const PromotionApprovalWidget: React.FC = () => {
     if (!rejectReason.trim()) return toast.error("Please provide a reason!");
     setRejecting(selectedBatchId);
     try {
-      const res = await fetch(`http://localhost:5000/api/promotions/${selectedBatchId}/reject`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${API_BASE}/api/promotions/${selectedBatchId}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

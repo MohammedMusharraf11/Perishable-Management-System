@@ -72,8 +72,9 @@ const ManagerDashboard = () => {
       const startDate = start || dateRange.startDate;
       const endDate = end || dateRange.endDate;
 
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(
-        `http://localhost:5000/api/reports/dashboard?startDate=${startDate}&endDate=${endDate}`
+        `${API_BASE}/api/reports/dashboard?startDate=${startDate}&endDate=${endDate}`
       );
 
       if (!response.ok) throw new Error("Failed to fetch dashboard data");
