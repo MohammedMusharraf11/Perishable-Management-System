@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, TrendingDown, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Check, X, TrendingDown, Loader2, RefreshCw, AlertCircle, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { generatePriceLabels } from "@/utils/labelGenerator";
 
 interface DiscountSuggestion {
   id: string;
@@ -141,6 +142,10 @@ const Pricing = () => {
           title: "Discount Approved",
           description: `${selectedSuggestion.stock_batches.items.name} discount of ${customDiscount}% has been applied.`,
         });
+        
+        // Auto-generate label after approval
+        handlePrintLabelForSuggestion(selectedSuggestion, customDiscount);
+        
         setShowApproveDialog(false);
         fetchSuggestions();
         fetchStats();
@@ -160,6 +165,32 @@ const Pricing = () => {
       });
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handlePrintLabelForSuggestion = (suggestion: DiscountSuggestion, discount: number) => {
+    try {
+      const item = suggestion.stock_batches.items;
+      generatePriceLabels([{
+        sku: item.sku,
+        name: item.name,
+        category: item.category,
+        basePrice: item.base_price,
+        currentDiscount: discount,
+        expiryDate: suggestion.stock_batches.expiry_date
+      }], true);
+      
+      toast({
+        title: "Label Generated",
+        description: `Price label ready for ${item.name}`,
+      });
+    } catch (error) {
+      console.error('Label generation error:', error);
+      toast({
+        title: "Warning",
+        description: "Discount approved but label generation failed",
+        variant: "destructive",
+      });
     }
   };
 
