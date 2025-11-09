@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getPendingSuggestions,
+  getApprovedSuggestions,
   triggerPricingAnalysis,
   approveSuggestion,
   rejectSuggestion,
@@ -16,6 +17,9 @@ const router = express.Router();
 
 // GET /api/discount-suggestions/pending - Get all pending suggestions
 router.get('/pending', getPendingSuggestions);
+
+// GET /api/discount-suggestions/approved - Get all approved suggestions
+router.get('/approved', getApprovedSuggestions);
 
 // GET /api/discount-suggestions/stats - Get suggestion statistics
 router.get('/stats', getSuggestionStats);

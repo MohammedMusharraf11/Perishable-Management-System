@@ -41,6 +41,49 @@ export const getPendingSuggestions = async (req, res) => {
 };
 
 /**
+ * GET /api/discount-suggestions/approved
+ * Get all approved discount suggestions for staff view
+ */
+export const getApprovedSuggestions = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('discount_suggestions')
+      .select(`
+        *,
+        stock_batches (
+          id,
+          quantity,
+          expiry_date,
+          items (
+            sku,
+            name,
+            base_price,
+            category,
+            unit
+          )
+        )
+      `)
+      .eq('status', 'approved')
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      success: true,
+      count: data?.length || 0,
+      data: data || []
+    });
+  } catch (error) {
+    console.error('Error fetching approved suggestions:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+/**
  * POST /api/discount-suggestions/analyze
  * Trigger pricing analysis manually
  */

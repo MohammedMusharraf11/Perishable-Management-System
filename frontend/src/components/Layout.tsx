@@ -57,12 +57,13 @@ export const Layout = ({ children }: LayoutProps) => {
         className="glass border-b border-border/50 sticky top-0 z-50 backdrop-blur-xl"
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to={user?.role === "Manager" ? "/manager" : "/dashboard"} className="flex items-center gap-2 group">
-            <div className="p-2 rounded-xl gradient-primary shadow-glow group-hover:scale-110 transition-transform">
-              <Package className="h-5 w-5 text-white" />
-            </div>
-            {/* FIXED TEXT VISIBILITY */}
-            <h1 className="text-xl font-bold text-primary dark:text-white">
+          <Link to={user?.role === "Manager" ? "/manager" : "/dashboard"} className="flex items-center gap-3 group">
+            <img 
+              src="/logo.png" 
+              alt="PMS Logo" 
+              className="h-10 w-10 object-contain group-hover:scale-110 transition-transform duration-300"
+            />
+            <h1 className="text-xl font-bold text-primary dark:text-primary">
               PMS
             </h1>
           </Link>
