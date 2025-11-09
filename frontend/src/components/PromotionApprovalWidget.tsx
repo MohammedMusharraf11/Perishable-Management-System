@@ -459,7 +459,7 @@ const PromotionApprovalWidget: React.FC = () => {
   if (!user || user.role !== "Manager") return null;
 
   return (
-    <motion.div className="w-full md:w-[440px] relative">
+    <motion.div className="w-full relative">
       <Card className="glass border-2 border-primary/10 shadow-md">
         <CardHeader className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
@@ -480,7 +480,7 @@ const PromotionApprovalWidget: React.FC = () => {
                     : type === "rejected"
                     ? "bg-red-600 text-white"
                     : "bg-yellow-500 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  : "bg-accent text-foreground hover:bg-accent/80"
               }`}
             >
               {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -506,45 +506,68 @@ const PromotionApprovalWidget: React.FC = () => {
               <Loader2 className="animate-spin mr-2" /> Loading...
             </div>
           ) : filteredSuggestions.length === 0 ? (
-            <p className="text-sm text-gray-500 italic text-center">
-              No {filter} promotions 🎉
-            </p>
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground italic">
+                No {filter} promotions 🎉
+              </p>
+            </div>
           ) : (
-            <ul className="divide-y divide-gray-200">
+            <ul className="space-y-0">
               {filteredSuggestions.map((s) => (
-                <li key={s.batch_id} className="py-2 flex justify-between items-center">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-gray-500" />
-                      <span className="font-medium">{s.product_name}</span>
+                <li key={s.batch_id} className="py-3 flex justify-between items-start gap-3 border-b border-border/30 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="font-semibold text-sm">{s.product_name || "Unknown Product"}</span>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Exp: {new Date(s.expiry_date).toLocaleDateString()} • {s.category}
+                    <div className="text-xs text-muted-foreground mb-1.5">
+                      {s.category && <span className="mr-2">📦 {s.category}</span>}
+                      {s.expiry_date && (
+                        <span>
+                          📅 Exp: {new Date(s.expiry_date).toLocaleDateString('en-IN', { 
+                            day: '2-digit', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-xs mt-1">
+                    <div className="flex items-center gap-2 text-xs mt-1">
                       <span className="line-through text-muted-foreground">
-                        ₹{s.original_price}
-                      </span>{" "}
-                      → <b>₹{s.suggested_price}</b> ({s.suggested_discount_percentage}%)
+                        ₹{s.original_price?.toFixed(2) || '0.00'}
+                      </span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-bold text-success">
+                        ₹{s.suggested_price?.toFixed(2) || '0.00'}
+                      </span>
+                      <span className="px-2 py-0.5 bg-warning/20 text-warning-foreground rounded-full font-medium">
+                        {s.suggested_discount_percentage}% OFF
+                      </span>
                     </div>
 
                     {s.status === "approved" && (
-                      <div className="text-xs text-green-600 mt-1">
-                        ✅ Approved by {s.approved_by_name || "Manager"} on{" "}
-                        {s.approved_at ? new Date(s.approved_at).toLocaleDateString() : ""}
+                      <div className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                        <span>✅</span>
+                        <span>Approved by {s.approved_by_name || "Manager"}</span>
+                        {s.approved_at && (
+                          <span className="text-muted-foreground">
+                            • {new Date(s.approved_at).toLocaleDateString('en-IN')}
+                          </span>
+                        )}
                       </div>
                     )}
                     {s.status === "rejected" && (
-                      <div className="text-xs text-red-600 mt-1">
-                        ❌ Rejected by {s.approved_by_name || "Manager"} – {s.rejection_reason}
+                      <div className="text-xs text-red-600 mt-2">
+                        <span>❌ Rejected</span>
+                        {s.rejection_reason && <span> – {s.rejection_reason}</span>}
                       </div>
                     )}
                   </div>
 
                   {s.status === "pending" && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-1.5 flex-shrink-0">
                       <button
-                        className="px-2 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700"
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors whitespace-nowrap"
                         onClick={() =>
                           openApproveModal(s.batch_id, s.suggested_discount_percentage)
                         }
@@ -552,7 +575,7 @@ const PromotionApprovalWidget: React.FC = () => {
                         Approve
                       </button>
                       <button
-                        className="px-2 py-1 bg-red-600 text-white rounded-md text-xs hover:bg-red-700"
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors whitespace-nowrap"
                         onClick={() => {
                           setSelectedBatchId(s.batch_id);
                           setShowRejectModal(true);
@@ -573,15 +596,15 @@ const PromotionApprovalWidget: React.FC = () => {
       <AnimatePresence>
         {showApproveModal && (
           <motion.div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <motion.div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-md relative">
+            <motion.div className="glass p-6 rounded-xl shadow-xl w-[90%] max-w-md relative border-2 border-primary/20">
               <button
                 onClick={() => setShowApproveModal(false)}
-                className="absolute top-3 right-3 text-gray-500 hover:text-black"
+                className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
               <h2 className="text-lg font-semibold mb-3">Approve Discount</h2>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Choose the discount percentage before approval.
               </p>
               <label className="block text-sm font-medium mb-2">
@@ -598,7 +621,7 @@ const PromotionApprovalWidget: React.FC = () => {
               <div className="mt-4 flex justify-end gap-3">
                 <button
                   onClick={() => setShowApproveModal(false)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm"
+                  className="px-4 py-2 bg-accent rounded-lg hover:bg-accent/80 text-sm"
                 >
                   Cancel
                 </button>
@@ -618,15 +641,15 @@ const PromotionApprovalWidget: React.FC = () => {
       <AnimatePresence>
         {showRejectModal && (
           <motion.div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <motion.div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-md relative">
+            <motion.div className="glass p-6 rounded-xl shadow-xl w-[90%] max-w-md relative border-2 border-primary/20">
               <button
                 onClick={() => setShowRejectModal(false)}
-                className="absolute top-3 right-3 text-gray-500 hover:text-black"
+                className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
               <h2 className="text-lg font-semibold mb-3">Reject Discount</h2>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Please enter a reason for rejecting this discount.
               </p>
               <textarea
@@ -639,7 +662,7 @@ const PromotionApprovalWidget: React.FC = () => {
               <div className="mt-4 flex justify-end gap-3">
                 <button
                   onClick={() => setShowRejectModal(false)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm"
+                  className="px-4 py-2 bg-accent rounded-lg hover:bg-accent/80 text-sm"
                 >
                   Cancel
                 </button>
