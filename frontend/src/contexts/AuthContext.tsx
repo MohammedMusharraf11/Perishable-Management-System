@@ -205,7 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // NEW: Get all users for admin management
   const getAllUsers = async (): Promise<User[]> => {
-    try:
+    try {
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(`${API_BASE}/api/admin/users`, {
         method: "GET",
