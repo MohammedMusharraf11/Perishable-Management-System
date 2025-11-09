@@ -1,8 +1,8 @@
 import express from 'express';
 import { runExpiryMonitorNow, getJobStatus } from '../jobs/expiryMonitor.job.js';
-import { 
-  runPricingAnalysisNow, 
-  getJobStatus as getPricingJobStatus 
+import {
+  runPricingAnalysisNow,
+  getJobStatus as getPricingJobStatus
 } from '../jobs/pricingAnalysis.job.js';
 import {
   runEmailNotificationNow,
@@ -19,18 +19,28 @@ const router = express.Router();
 router.get('/expiry-monitor/run', async (req, res) => {
   try {
     console.log('📡 Manual expiry monitor trigger received');
-    const result = await runExpiryMonitorNow();
-    
+
+    // Respond immediately to avoid timeout
     res.status(200).json({
       success: true,
-      message: 'Expiry monitor job executed',
-      result
+      message: 'Expiry monitor job started',
+      status: 'processing'
     });
+
+    // Process monitoring in background (don't await)
+    runExpiryMonitorNow()
+      .then(result => {
+        console.log('✅ Expiry monitor job completed:', result);
+      })
+      .catch(error => {
+        console.error('❌ Expiry monitor job failed:', error);
+      });
+
   } catch (error) {
-    console.error('Error running expiry monitor:', error);
+    console.error('Error starting expiry monitor:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to run expiry monitor',
+      message: 'Failed to start expiry monitor',
       error: error.message
     });
   }
@@ -55,18 +65,28 @@ router.get('/expiry-monitor/status', (req, res) => {
 router.get('/pricing-analysis/run', async (req, res) => {
   try {
     console.log('📡 Manual pricing analysis trigger received');
-    const result = await runPricingAnalysisNow();
-    
+
+    // Respond immediately to avoid timeout
     res.status(200).json({
       success: true,
-      message: 'Pricing analysis job executed',
-      result
+      message: 'Pricing analysis job started',
+      status: 'processing'
     });
+
+    // Process analysis in background (don't await)
+    runPricingAnalysisNow()
+      .then(result => {
+        console.log('✅ Pricing analysis job completed:', result);
+      })
+      .catch(error => {
+        console.error('❌ Pricing analysis job failed:', error);
+      });
+
   } catch (error) {
-    console.error('Error running pricing analysis:', error);
+    console.error('Error starting pricing analysis:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to run pricing analysis',
+      message: 'Failed to start pricing analysis',
       error: error.message
     });
   }
@@ -91,18 +111,28 @@ router.get('/pricing-analysis/status', (req, res) => {
 router.get('/email-notification/run', async (req, res) => {
   try {
     console.log('📡 Manual email notification trigger received');
-    const result = await runEmailNotificationNow();
-    
+
+    // Respond immediately to avoid timeout
     res.status(200).json({
       success: true,
-      message: 'Email notification job executed',
-      result
+      message: 'Email notification job started',
+      status: 'processing'
     });
+
+    // Process emails in background (don't await)
+    runEmailNotificationNow()
+      .then(result => {
+        console.log('✅ Email notification job completed:', result);
+      })
+      .catch(error => {
+        console.error('❌ Email notification job failed:', error);
+      });
+
   } catch (error) {
-    console.error('Error running email notification:', error);
+    console.error('Error starting email notification:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to run email notification',
+      message: 'Failed to start email notification',
       error: error.message
     });
   }
@@ -127,7 +157,7 @@ router.get('/email-notification/status', (req, res) => {
 router.post('/email-notification/test', async (req, res) => {
   try {
     const { email, name } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -137,11 +167,11 @@ router.post('/email-notification/test', async (req, res) => {
 
     console.log(`📧 Sending test email to ${email}...`);
     const result = await sendTestEmail(email, name || 'Test User');
-    
+
     res.status(200).json({
       success: result.success,
-      message: result.success 
-        ? 'Test email sent successfully' 
+      message: result.success
+        ? 'Test email sent successfully'
         : 'Failed to send test email',
       result
     });
