@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS waste_logs (
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE waste_logs 
+ADD COLUMN IF NOT EXISTS user_reference TEXT,
+ADD COLUMN IF NOT EXISTS user_role VARCHAR(20);
 
 -- ============================================
 -- TABLE: alerts

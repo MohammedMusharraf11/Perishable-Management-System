@@ -3,7 +3,8 @@ import {
   getInventory,
   addInventoryBatch,
   deleteInventoryBatch,
-  updateInventoryQuantity
+  updateInventoryQuantity,
+  markAsWaste,
 } from '../controllers/inventory_controller.js'; // Import from the new controller
 
 const router = express.Router();
@@ -19,5 +20,7 @@ router.put('/stock/:batchId', updateInventoryQuantity);
 
 // DELETE /api/inventory/stock/:id
 router.delete('/stock/:id', deleteInventoryBatch);
+
+router.put('/waste/:batchId', markAsWaste);
 
 export default router;

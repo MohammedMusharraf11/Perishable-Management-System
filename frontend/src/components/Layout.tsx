@@ -11,6 +11,7 @@ import {
   DollarSign,
   BarChart3,
   FileText,
+  Trash2,
   User,
   LogOut,
 } from "lucide-react";
@@ -25,14 +26,27 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navItems = [
-    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  const allNavItems = [
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, excludeRole: "Manager" },
+    { path: "/manager", label: "Dashboard", icon: LayoutDashboard, requiredRole: "Manager" },
     { path: "/inventory", label: "Inventory", icon: Package },
     { path: "/alerts", label: "Alerts", icon: AlertTriangle },
     { path: "/pricing", label: "Pricing", icon: DollarSign },
     { path: "/reports", label: "Reports", icon: BarChart3 },
+    { path: "/waste-report", label: "Waste Report", icon: Trash2, requiredRole: "Manager" },
     { path: "/audit-log", label: "Audit Log", icon: FileText },
   ];
+
+  // Filter nav items based on user role
+  const navItems = allNavItems.filter((item) => {
+    if (item.requiredRole) {
+      return user?.role === item.requiredRole;
+    }
+    if (item.excludeRole) {
+      return user?.role !== item.excludeRole;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -43,12 +57,13 @@ export const Layout = ({ children }: LayoutProps) => {
         className="glass border-b border-border/50 sticky top-0 z-50 backdrop-blur-xl"
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2 group">
-            <div className="p-2 rounded-xl gradient-primary shadow-glow group-hover:scale-110 transition-transform">
-              <Package className="h-5 w-5 text-white" />
-            </div>
-            {/* FIXED TEXT VISIBILITY */}
-            <h1 className="text-xl font-bold text-primary dark:text-white">
+          <Link to={user?.role === "Manager" ? "/manager" : "/dashboard"} className="flex items-center gap-3 group">
+            <img 
+              src="/logo.png" 
+              alt="PMS Logo" 
+              className="h-10 w-10 object-contain group-hover:scale-110 transition-transform duration-300"
+            />
+            <h1 className="text-xl font-bold text-primary dark:text-primary">
               PMS
             </h1>
           </Link>

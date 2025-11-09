@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { RoleBasedRedirect } from "./components/RoleBasedRedirect";
 
 // ✅ Pages
 import Login from "./pages/Login";
@@ -15,13 +16,14 @@ import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
 import Pricing from "./pages/Pricing";
 import Reports from "./pages/Reports";
+import WasteReport from "./pages/WasteReport";
 import AuditLog from "./pages/AuditLog";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
-// ✅ Role-based dashboards (optional)
+// ✅ Role-based dashboards
 import AdminDashboard from "./pages/AdminDashboard";
-//import ManagerDashboard from "./pages/ManagerDashboard";
+import ManagerDashboard from "./pages/ManagerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -34,8 +36,8 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              {/* Default route */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {/* Default route - redirects based on user role */}
+              <Route path="/" element={<RoleBasedRedirect />} />
 
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -45,7 +47,7 @@ const App = () => (
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="Staff">
                     <Dashboard />
                   </ProtectedRoute>
                 }
@@ -83,6 +85,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/waste-report"
+                element={
+                  <ProtectedRoute requiredRole="Manager">
+                    <WasteReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/audit-log"
                 element={
                   <ProtectedRoute>
@@ -108,14 +118,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              {/* <Route
+              <Route
                 path="/manager"
                 element={
                   <ProtectedRoute requiredRole="Manager">
                     <ManagerDashboard />
                   </ProtectedRoute>
                 }
-              /> */}
+              />
 
               {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />
