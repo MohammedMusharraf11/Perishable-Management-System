@@ -60,12 +60,12 @@ const AlertWidget: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <Card className="border border-border/50 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01] bg-white/90 backdrop-blur-md">
+      <Card className="glass border-2 border-primary/10 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
         {/* 🔹 Header: REMOVED sm:justify-between TO LEFT ALIGN ALL CONTENT */}
         <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <CardTitle className="text-lg font-semibold text-gray-800">
+            <CardTitle className="text-lg font-semibold">
               Expiry Alerts
             </CardTitle>
           </div>
@@ -97,14 +97,14 @@ const AlertWidget: React.FC = () => {
           <div className="border-t border-border/60 my-2"></div>
 
           {/* 🧾 Top Critical Items */}
-          <div className="bg-gray-50 rounded-lg p-3 shadow-inner">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+          <div className="bg-accent/30 rounded-lg p-3 border border-border/50">
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
               Top Critical Items
             </h3>
 
             {data.topCritical.length === 0 ? (
-              <p className="text-sm text-gray-500 italic text-center py-2">
+              <p className="text-sm text-muted-foreground italic text-center py-2">
                 No critical items 🎉
               </p>
             ) : (
@@ -128,7 +128,7 @@ const AlertWidget: React.FC = () => {
                       ? "text-orange-500"
                       : label === "Soon"
                       ? "text-yellow-500"
-                      : "text-gray-400";
+                      : "text-muted-foreground";
 
                   return (
                     <motion.li
@@ -139,8 +139,8 @@ const AlertWidget: React.FC = () => {
                       transition={{ delay: i * 0.05 }}
                     >
                       <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium text-gray-800">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">
                           {name}
                         </span>
                       </div>
@@ -150,7 +150,7 @@ const AlertWidget: React.FC = () => {
                         >
                           {label}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted-foreground">
                           {date.toLocaleDateString()}
                         </span>
                       </div>

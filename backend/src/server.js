@@ -9,6 +9,8 @@ import { rateLimitLogin } from "./middleware/auth.middleware.js";
 
 // Jobs
 import { startExpiryMonitorJob } from "./jobs/expiryMonitor.job.js";
+import { startPricingAnalysisJob } from "./jobs/pricingAnalysis.job.js";
+import { startEmailNotificationJob } from "./jobs/emailNotification.job.js";
 
 // Routes
 import authRoutes from "./routes/auth.routes.js";
@@ -21,6 +23,7 @@ import reportRoutes from "./routes/report.routes.js";
 import publicEnvRouter from "./routes/publicENV.js";
 import alertRoutes from "./routes/alert_routes.js";
 import promotionRoutes from "./routes/promotion.routes.js";
+import discountSuggestionRoutes from "./routes/discountSuggestion.routes.js";
 
 // Supabase client
 import "./config/supabaseClient.js";
@@ -142,6 +145,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/publicENV", publicEnvRouter);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/promotions", promotionRoutes);
+app.use("/api/discount-suggestions", discountSuggestionRoutes);
 
 // ======================================================
 // Health Check
@@ -180,6 +184,8 @@ app.listen(PORT, () => {
   console.log("-".repeat(60));
   console.log("⏰ Initializing Scheduled Jobs...");
   startExpiryMonitorJob();
+  startPricingAnalysisJob();
+  startEmailNotificationJob();
   console.log("=".repeat(60));
 });
 
